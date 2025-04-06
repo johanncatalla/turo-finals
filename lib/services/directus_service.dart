@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DirectusService {
-  final String baseUrl = dotenv.env['DIRECTUS_API_URL'] ?? 'https://ceo-turo.directus.app';
+  final String baseUrl = dotenv.env['DIRECTUS_API_URL'] ?? 'http://ec2-13-239-184-136.ap-southeast-2.compute.amazonaws.com';
   
   // Singleton pattern
   static final DirectusService _instance = DirectusService._internal();
