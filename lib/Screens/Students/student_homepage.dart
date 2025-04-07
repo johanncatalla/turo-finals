@@ -435,14 +435,23 @@ class _StudentHomepageState extends State<StudentHomepage> {
       return course['categories'].contains(selectedCategory);
     }).toList();
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: filteredCourses.length,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemBuilder: (context, index) {
-        return _buildCourseItem(filteredCourses[index]);
-      },
+    // Calculate the minimum height for 3 items
+    // Each course item is about 140 pixels high (120px image height + margins)
+    final minHeight = 3 * 140.0;
+
+    return Container(
+      constraints: BoxConstraints(
+        minHeight: minHeight,
+      ),
+      child: ListView.builder(
+        shrinkWrap: true, // Make list take only the space it needs
+        physics: const NeverScrollableScrollPhysics(), // Disable scrolling
+        itemCount: filteredCourses.length,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemBuilder: (context, index) {
+          return _buildCourseItem(filteredCourses[index]);
+        },
+      ),
     );
   }
 
@@ -525,7 +534,7 @@ class _StudentHomepageState extends State<StudentHomepage> {
   // Bottom navigation bar
   Widget _buildBottomNavigationBar() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      margin: const EdgeInsets.fromLTRB(40, 0, 40, 16),
       height: 60,
       decoration: BoxDecoration(
         color: Colors.black,
