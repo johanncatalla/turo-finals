@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:turo/providers/auth_provider.dart';
 import 'package:turo/role_select.dart';
+import 'package:turo/Screens/Students/search.dart';
 
 class StudentHomepage extends StatefulWidget {
   const StudentHomepage({super.key});
@@ -543,7 +544,7 @@ class _StudentHomepageState extends State<StudentHomepage> {
           BoxShadow(
             color: Colors.black.withOpacity(0.2),
             blurRadius: 10,
-            spreadRadius: 1,
+            spreadRadius: 1
           ),
         ],
       ),
@@ -558,15 +559,14 @@ class _StudentHomepageState extends State<StudentHomepage> {
       ),
     );
   }
-  
+
   Widget _buildNavItem(int index, IconData icon, String label) {
     bool isSelected = _selectedMenuIndex == index;
-    
+
     return InkWell(
       onTap: () {
-        setState(() {
-          _selectedMenuIndex = index;
-        });
+        // Navigate based on the selected index
+        _navigateToSelectedPage(index);
       },
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -589,5 +589,49 @@ class _StudentHomepageState extends State<StudentHomepage> {
         ],
       ),
     );
+  }
+
+// Add this new method to handle navigation
+  void _navigateToSelectedPage(int index) {
+    // Only navigate if we're not already on that page
+    if (_selectedMenuIndex == index) {
+      return;
+    }
+    if (index == 0) {
+      // Just update state for Home, no navigation needed
+      setState(() {
+        _selectedMenuIndex = 0;
+      });
+    } else if (index == 1) {
+      // Navigate to Search page
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => Search()),
+      ).then((_) {
+        // When returning from Search page, reset to Home
+        setState(() {
+          _selectedMenuIndex = 0;
+        });
+      });
+    } else if (index == 2) {
+      // Navigate to My Courses page
+      // For now, just show a snackbar that this feature is coming soon
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('My Courses coming soon!')),
+      );
+      // Reset to home tab
+      setState(() {
+        _selectedMenuIndex = 0;
+      });
+    } else if (index == 3) {
+      // Navigate to Profile page
+      // For now, just show a snackbar that this feature is coming soon
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Profile coming soon!')),
+      );
+      // Reset to home tab
+      setState(() {
+        _selectedMenuIndex = 0;
+      });
+    }
   }
 }
