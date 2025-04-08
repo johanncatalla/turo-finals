@@ -65,7 +65,6 @@ flutter:
 
   assets:
     - .env
-    - assets/.env
     - assets/
     - assets/courses/
     - assets/turo_logo.png
