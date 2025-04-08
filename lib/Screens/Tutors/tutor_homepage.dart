@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:turo/providers/auth_provider.dart';
 import 'package:turo/role_select.dart';
+import 'package:turo/Screens/Tutors/tutor_profileui_test.dart';
 
 class TutorHomepage extends StatefulWidget {
   const TutorHomepage({super.key});
@@ -30,6 +31,14 @@ class _TutorHomepageState extends State<TutorHomepage> {
         });
       }
     });
+  }
+
+  // Navigate to profile screen
+  void _navigateToProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const TutorProfileScreen()),
+    );
   }
 
   // Add logout method
@@ -102,28 +111,42 @@ class _TutorHomepageState extends State<TutorHomepage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Good day,',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  height: 0,
-                  fontWeight: FontWeight.normal,
+          // Make the name clickable by wrapping in GestureDetector
+          GestureDetector(
+            onTap: _navigateToProfile,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Good day,',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    height: 0,
+                    fontWeight: FontWeight.normal,
+                  ),
                 ),
-              ),
-              Text(
-                _tutorName,
-                style: const TextStyle(
-                  fontSize: 20,
-                  height: 0,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.teal, // Changed to teal for tutor
+                Row(
+                  children: [
+                    Text(
+                      _tutorName,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        height: 0,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.teal, // Changed to teal for tutor
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      size: 14,
+                      color: Colors.teal,
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           Row(
             children: [
