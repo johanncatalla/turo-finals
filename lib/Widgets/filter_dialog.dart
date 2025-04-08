@@ -1,13 +1,13 @@
-// Create a new file: lib/Widgets/filter_dialog.dart
-
 import 'package:flutter/material.dart';
 
 class FilterDialog extends StatefulWidget {
   final Function(Map<String, dynamic>) onApplyFilter;
+  final int initialMode;
 
   const FilterDialog({
     Key? key,
     required this.onApplyFilter,
+    this.initialMode = 0,
   }) : super(key: key);
 
   @override
@@ -15,15 +15,15 @@ class FilterDialog extends StatefulWidget {
 }
 
 class _FilterDialogState extends State<FilterDialog> {
-  // Selected filter type
-  String _selectedFilterType = 'Tutors';
+  // Selected filter type (0 = Tutors, 1 = Courses, 2 = Modules)
+  late int _selectedMode;
 
   // Selected categories
   final List<String> _selectedCategories = [];
 
   // Price range
-  double _minPrice = 0;
-  double _maxPrice = 500;
+  double _minPrice = 98;
+  double _maxPrice = 308;
 
   // Rating
   int _selectedRating = 4;
@@ -35,6 +35,12 @@ class _FilterDialogState extends State<FilterDialog> {
   final List<String> _categories = [
     'Math', 'English', 'Science', 'Filipino', 'Programming', 'Journalism'
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedMode = widget.initialMode;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,26 +103,34 @@ class _FilterDialogState extends State<FilterDialog> {
               ],
             ),
             const SizedBox(height: 20),
+
             // Filter Types
+            const Text(
+              'Search For',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: _filterTypes.map((type) {
-                  bool isSelected = _selectedFilterType == type;
+                children: _filterTypes.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  String type = entry.value;
+                  bool isSelected = _selectedMode == index;
                   return Container(
                     margin: const EdgeInsets.only(right: 10),
                     child: ElevatedButton(
                       onPressed: () {
                         setState(() {
-                          _selectedFilterType = type;
+                          _selectedMode = index;
                         });
                       },
                       style: ElevatedButton.styleFrom(
-                        textStyle: TextStyle(
-                            fontSize: 12,
-                          fontWeight: FontWeight.bold
-                        ),
-                        foregroundColor: isSelected ? Colors.white : Colors.black, backgroundColor: isSelected ? const Color(0xFF4DA6A6) : Colors.white,
+                        foregroundColor: isSelected ? Colors.white : Colors.black,
+                        backgroundColor: isSelected ? const Color(0xFF4DA6A6) : Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -126,7 +140,12 @@ class _FilterDialogState extends State<FilterDialog> {
                         ),
                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                       ),
-                      child: Text(type),
+                      child: Text(
+                        type,
+                        style: const TextStyle(
+                          fontSize: 12, // Updated font size to 12
+                        ),
+                      ),
                     ),
                   );
                 }).toList(),
@@ -138,11 +157,11 @@ class _FilterDialogState extends State<FilterDialog> {
             const Text(
               'Category',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 10,
               runSpacing: 10,
@@ -159,11 +178,8 @@ class _FilterDialogState extends State<FilterDialog> {
                     });
                   },
                   style: ElevatedButton.styleFrom(
-                    textStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold
-                    ),
-                    foregroundColor: isSelected ? Colors.white : Colors.black, backgroundColor: isSelected ? const Color(0xFF4DA6A6) : Colors.white,
+                    foregroundColor: isSelected ? Colors.white : Colors.black,
+                    backgroundColor: isSelected ? const Color(0xFF4DA6A6) : Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -173,7 +189,12 @@ class _FilterDialogState extends State<FilterDialog> {
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   ),
-                  child: Text(category),
+                  child: Text(
+                    category,
+                    style: const TextStyle(
+                      fontSize: 12, // Updated font size to 12
+                    ),
+                  ),
                 );
               }).toList()..add(
                 ElevatedButton(
@@ -181,11 +202,8 @@ class _FilterDialogState extends State<FilterDialog> {
                     // Implement "More" functionality if needed
                   },
                   style: ElevatedButton.styleFrom(
-                    textStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold
-                    ),
-                    foregroundColor: Colors.grey, backgroundColor: Colors.white,
+                    foregroundColor: Colors.grey,
+                    backgroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -195,82 +213,95 @@ class _FilterDialogState extends State<FilterDialog> {
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   ),
-                  child: const Text('More +'),
+                  child: const Text(
+                    'More +',
+                    style: TextStyle(
+                      fontSize: 12, // Updated font size to 12
+                    ),
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 24),
 
-            // Price Range
-            const Text(
-              'Price Range',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+            // Price Range - Only show for Tutors
+            if (_selectedMode == 0) ...[
+              const Text(
+                'Price Range',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            SliderTheme(
-              data: SliderThemeData(
-                thumbColor: const Color(0xFF4DA6A6),
-                activeTrackColor: const Color(0xFF4DA6A6),
-                inactiveTrackColor: Colors.grey.shade300,
-                trackHeight: 4,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+              const SizedBox(height: 12),
+              SliderTheme(
+                data: SliderThemeData(
+                  thumbColor: const Color(0xFF4DA6A6),
+                  activeTrackColor: const Color(0xFF4DA6A6),
+                  inactiveTrackColor: Colors.grey.shade300,
+                  trackHeight: 4,
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                ),
+                child: RangeSlider(
+                  values: RangeValues(_minPrice, _maxPrice),
+                  min: 0,
+                  max: 500,
+                  onChanged: (RangeValues values) {
+                    setState(() {
+                      _minPrice = values.start;
+                      _maxPrice = values.end;
+                    });
+                  },
+                ),
               ),
-              child: RangeSlider(
-                values: RangeValues(_minPrice, _maxPrice),
-                min: 0,
-                max: 500,
-                onChanged: (RangeValues values) {
-                  setState(() {
-                    _minPrice = values.start;
-                    _maxPrice = values.end;
-                  });
-                },
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        '₱${_minPrice.toInt()}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12, // Updated font size to 12
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        '₱${_maxPrice.toInt()}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12, // Updated font size to 12
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      '₱${_minPrice.toInt()}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      '₱${_maxPrice.toInt()}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+            ],
 
             // Rating
             const Text(
               'Rating',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Row(
               children: List.generate(
                 5,
@@ -299,7 +330,6 @@ class _FilterDialogState extends State<FilterDialog> {
                   child: OutlinedButton(
                     onPressed: () {
                       setState(() {
-                        _selectedFilterType = 'Tutors';
                         _selectedCategories.clear();
                         _minPrice = 98;
                         _maxPrice = 308;
@@ -307,13 +337,19 @@ class _FilterDialogState extends State<FilterDialog> {
                       });
                     },
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 16),
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       side: BorderSide(color: Colors.grey.shade300),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text('Clear Filter'),
+                    child: const Text(
+                      'Clear Filter',
+                      style: TextStyle(
+                        fontSize: 12, // Updated font size to 12
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -322,7 +358,7 @@ class _FilterDialogState extends State<FilterDialog> {
                     onPressed: () {
                       // Create filter parameters
                       final Map<String, dynamic> filterParams = {
-                        'type': _selectedFilterType,
+                        'mode': _selectedMode,
                         'categories': _selectedCategories,
                         'priceRange': {
                           'min': _minPrice.toInt(),
@@ -344,7 +380,12 @@ class _FilterDialogState extends State<FilterDialog> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text('Apply Filter'),
+                    child: const Text(
+                      'Apply Filter',
+                      style: TextStyle(
+                        fontSize: 12, // Updated font size to 12
+                      ),
+                    ),
                   ),
                 ),
               ],

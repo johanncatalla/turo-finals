@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:turo/Screens/Students/student_homepage.dart';
 import '../../Widgets/navbar.dart';
-import '../../Widgets/filter_dialog.dart'; // Import the filter dialog
-import '../../Widgets/tutor_card.dart'; // Import the reusable TutorCard
+import '../../Widgets/filter_dialog.dart';
+import '../../Widgets/tutor_card.dart';
+import '../../Widgets/course_card.dart';
 
 class Search extends StatefulWidget {
   const Search({super.key});
@@ -12,9 +12,9 @@ class Search extends StatefulWidget {
 }
 
 class _SearchState extends State<Search> {
-  int selectedMode = 0;
+  int selectedMode = 0; // 0 = Tutor, 1 = Course, 2 = Module
   int selectedIndex = 1; // Navigation currently at 1
-  final List<String> _searchMode = ['Tutor', 'Course', 'Module'];
+  final List<String> _searchModeLabels = ['Tutor', 'Course', 'Module'];
   final TextEditingController _searchController = TextEditingController();
 
   // Filter parameters
@@ -74,38 +74,67 @@ class _SearchState extends State<Search> {
       'rating': 4.8,
       'bio': 'I\'m Juan De La Cruz, a multi-passionate CS student with a deep fascination for computers and technology. Currently wor...',
     },
+  ];
+
+  // Dummy data for list of courses
+  final List<Map<String, dynamic>> _courses = [
     {
-      'name': 'Carlos Santos',
-      'image': 'assets/joshua.png',
-      'verified': true,
-      'price': '₱300/hr',
-      'priceValue': 300,
-      'tags': ['Science', 'Math'],
-      'experience': '3+',
-      'rating': 4.5,
-      'bio': 'Experienced science and math tutor with a background in engineering. I specialize in making complex concepts accessible to students...',
+      'title': 'Introduction to Python',
+      'image': 'assets/courses/python.png',
+      'schedule': '1hr/day',
+      'instructor': 'Mr. Catalla',
+      'description': 'An engaging beginner-friendly course that introduces the fundamentals of Python...',
+      'tags': ['Programming', 'Computer Science'],
+      'rating': 4.7,
     },
     {
-      'name': 'Maria Reyes',
-      'image': 'assets/joshua.png',
-      'verified': true,
-      'price': '₱250/hr',
-      'priceValue': 250,
-      'tags': ['Filipino', 'Journalism'],
-      'experience': '4+',
+      'title': 'Conversational English',
+      'image': 'assets/courses/python.png',
+      'schedule': '1hr/day',
+      'instructor': 'Mr. Echevaria',
+      'description': 'A practical course designed to build confidence and fluency in conversational...',
+      'tags': ['English', 'Language'],
       'rating': 4.9,
-      'bio': 'Former journalist with a passion for teaching language and writing skills. I help students improve their communication abilities...',
+    },
+    {
+      'title': 'Foundational Algebra',
+      'image': 'assets/courses/python.png',
+      'schedule': '1hr/day',
+      'instructor': 'Ms. Oriola',
+      'description': 'A foundational course that explores the core principles of algebra, including solving...',
+      'tags': ['Math', 'Algebra'],
+      'rating': 4.6,
+    },
+    {
+      'title': 'Basic Chemistry',
+      'image': 'assets/courses/python.png',
+      'schedule': '1hr/day',
+      'instructor': 'Ms. Erika',
+      'description': 'A practical course designed to build confidence and fluency in understanding and applying chemistry...',
+      'tags': ['Science', 'Chemistry'],
+      'rating': 4.8,
+    },
+    {
+      'title': 'Journalism',
+      'image': 'assets/courses/python.png',
+      'schedule': '1hr/day',
+      'instructor': 'Mr. Santos',
+      'description': 'Learn the fundamentals of journalism and develop essential writing and reporting skills...',
+      'tags': ['Journalism', 'Writing'],
+      'rating': 4.5,
     },
   ];
 
-  // Filtered tutors list
+  // Filtered lists
   List<Map<String, dynamic>> _filteredTutors = [];
+  List<Map<String, dynamic>> _filteredCourses = [];
 
   @override
   void initState() {
     super.initState();
-    // Initialize filtered tutors with all tutors
+    // Initialize filtered lists
     _filteredTutors = List.from(_tutors);
+    _filteredCourses = List.from(_courses);
   }
 
   // Handle filter application
@@ -113,42 +142,77 @@ class _SearchState extends State<Search> {
     setState(() {
       _activeFilters = filters;
 
-      // Start with all tutors
-      _filteredTutors = List.from(_tutors);
-
-      // Apply category filter
-      if (filters.containsKey('categories') &&
-          filters['categories'] is List &&
-          (filters['categories'] as List).isNotEmpty) {
-
-        _filteredTutors = _filteredTutors.where((tutor) {
-          // Check if any of the tutor's tags match any of the selected categories
-          return tutor['tags'].any((tag) =>
-              (filters['categories'] as List).contains(tag));
-        }).toList();
+      // Update selected mode if it changed
+      if (filters.containsKey('mode')) {
+        selectedMode = filters['mode'] as int;
       }
 
-      // Apply price range filter
-      if (filters.containsKey('priceRange') && filters['priceRange'] is Map) {
-        int minPrice = filters['priceRange']['min'] as int;
-        int maxPrice = filters['priceRange']['max'] as int;
+      // Apply filters based on selected mode
+      if (selectedMode == 0) {
+        // Filter tutors
+        _filteredTutors = List.from(_tutors);
 
-        _filteredTutors = _filteredTutors.where((tutor) {
-          // Extract numeric price value
-          int price = tutor['priceValue'] as int;
-          return price >= minPrice && price <= maxPrice;
-        }).toList();
+        // Apply category filter
+        if (filters.containsKey('categories') &&
+            filters['categories'] is List &&
+            (filters['categories'] as List).isNotEmpty) {
+          _filteredTutors = _filteredTutors.where((tutor) {
+            return tutor['tags'].any((tag) =>
+                (filters['categories'] as List).contains(tag));
+          }).toList();
+        }
+
+        // Apply price range filter
+        if (filters.containsKey('priceRange') && filters['priceRange'] is Map) {
+          int minPrice = filters['priceRange']['min'] as int;
+          int maxPrice = filters['priceRange']['max'] as int;
+
+          _filteredTutors = _filteredTutors.where((tutor) {
+            int price = tutor['priceValue'] as int;
+            return price >= minPrice && price <= maxPrice;
+          }).toList();
+        }
+
+        // Apply rating filter
+        if (filters.containsKey('rating') && filters['rating'] is int) {
+          int minRating = filters['rating'] as int;
+
+          _filteredTutors = _filteredTutors.where((tutor) {
+            double rating = tutor['rating'] as double;
+            return rating >= minRating;
+          }).toList();
+        }
+
+        // Clear search field to avoid confusion
+        _searchController.clear();
+      } else if (selectedMode == 1) {
+        // Filter courses
+        _filteredCourses = List.from(_courses);
+
+        // Apply category filter
+        if (filters.containsKey('categories') &&
+            filters['categories'] is List &&
+            (filters['categories'] as List).isNotEmpty) {
+          _filteredCourses = _filteredCourses.where((course) {
+            return course['tags'].any((tag) =>
+                (filters['categories'] as List).contains(tag));
+          }).toList();
+        }
+
+        // Apply rating filter
+        if (filters.containsKey('rating') && filters['rating'] is int) {
+          int minRating = filters['rating'] as int;
+
+          _filteredCourses = _filteredCourses.where((course) {
+            double rating = course['rating'] as double;
+            return rating >= minRating;
+          }).toList();
+        }
+
+        // Clear search field to avoid confusion
+        _searchController.clear();
       }
-
-      // Apply rating filter
-      if (filters.containsKey('rating') && filters['rating'] is int) {
-        int minRating = filters['rating'] as int;
-
-        _filteredTutors = _filteredTutors.where((tutor) {
-          double rating = tutor['rating'] as double;
-          return rating >= minRating;
-        }).toList();
-      }
+      // Module filtering can be added for mode 2
     });
   }
 
@@ -174,6 +238,7 @@ class _SearchState extends State<Search> {
           ).animate(curvedAnimation),
           child: FilterDialog(
             onApplyFilter: _applyFilters,
+            initialMode: selectedMode,
           ),
         );
       },
@@ -183,8 +248,13 @@ class _SearchState extends State<Search> {
   // Navigate to tutor profile
   void _navigateToTutorProfile(Map<String, dynamic> tutor) {
     // Implement navigation to tutor profile
-    // For example: Navigator.pushNamed(context, '/tutor-profile', arguments: tutor);
     print('Navigate to profile for: ${tutor['name']}');
+  }
+
+  // Navigate to course details
+  void _navigateToCourseDetails(Map<String, dynamic> course) {
+    // Implement navigation to course details
+    print('Navigate to course: ${course['title']}');
   }
 
   @override
@@ -199,22 +269,22 @@ class _SearchState extends State<Search> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: RichText(
-                text: const TextSpan(
+                text: TextSpan(
                   text: 'Find the ',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
                   children: [
                     TextSpan(
-                      text: 'best tutor',
-                      style: TextStyle(
+                      text: selectedMode == 0 ? 'best tutor' : 'best course',
+                      style: const TextStyle(
                         color: Color(0xFF4DA6A6),
                       ),
                     ),
-                    TextSpan(text: '\njust for '),
-                    TextSpan(
+                    const TextSpan(text: '\njust for '),
+                    const TextSpan(
                       text: 'you',
                       style: TextStyle(
                         color: Color(0xFFF7941D),
@@ -225,17 +295,21 @@ class _SearchState extends State<Search> {
               ),
             ),
             const SizedBox(height: 5),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text(
-                'Customize the search filter to find a tutor that match your needs.',
-                style: TextStyle(
+                selectedMode == 0
+                    ? 'Customize the search filter to find a tutor that match your needs.'
+                    : 'Customize the search filter to find a course that match your needs.',
+                style: const TextStyle(
                   fontSize: 16,
                   color: Colors.black87,
                 ),
               ),
             ),
             const SizedBox(height: 20),
+
+            // Search bar and filter button
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
@@ -260,52 +334,84 @@ class _SearchState extends State<Search> {
                                 hintStyle: TextStyle(color: Colors.grey),
                               ),
                               onChanged: (value) {
-                                // Add search functionality
                                 setState(() {
                                   if (value.isEmpty) {
-                                    // If search is empty, show filtered tutors based on active filters
+                                    // If search is empty, show filtered items based on active filters
                                     _applyFilters(_activeFilters);
                                   } else {
-                                    // Filter tutors by name and apply active filters
-                                    _filteredTutors = _tutors.where((tutor) {
-                                      bool matchesSearch = tutor['name']
-                                          .toString()
-                                          .toLowerCase()
-                                          .contains(value.toLowerCase());
+                                    // Apply search filter based on selected mode
+                                    if (selectedMode == 0) {
+                                      // Search tutors
+                                      _filteredTutors = _tutors.where((tutor) {
+                                        bool matchesSearch = tutor['name']
+                                            .toString()
+                                            .toLowerCase()
+                                            .contains(value.toLowerCase());
 
-                                      // Apply other filters
-                                      bool matchesFilters = true;
+                                        // Apply other active filters
+                                        bool matchesFilters = true;
 
-                                      // Skip filtering if no active filters
-                                      if (_activeFilters.isEmpty) {
-                                        return matchesSearch;
-                                      }
+                                        // Apply category filter if active
+                                        if (_activeFilters.containsKey('categories') &&
+                                            _activeFilters['categories'] is List &&
+                                            (_activeFilters['categories'] as List).isNotEmpty) {
+                                          matchesFilters = tutor['tags'].any((tag) =>
+                                              (_activeFilters['categories'] as List).contains(tag));
+                                        }
 
-                                      // Apply category filter
-                                      if (_activeFilters.containsKey('categories') &&
-                                          _activeFilters['categories'] is List &&
-                                          (_activeFilters['categories'] as List).isNotEmpty) {
-                                        matchesFilters = tutor['tags'].any((tag) =>
-                                            (_activeFilters['categories'] as List).contains(tag));
-                                      }
+                                        // Apply price filter if active
+                                        if (matchesFilters &&
+                                            _activeFilters.containsKey('priceRange') &&
+                                            _activeFilters['priceRange'] is Map) {
+                                          int minPrice = _activeFilters['priceRange']['min'] as int;
+                                          int maxPrice = _activeFilters['priceRange']['max'] as int;
+                                          int price = tutor['priceValue'] as int;
+                                          matchesFilters = price >= minPrice && price <= maxPrice;
+                                        }
 
-                                      // Apply price filter
-                                      if (matchesFilters && _activeFilters.containsKey('priceRange') &&
-                                          _activeFilters['priceRange'] is Map) {
-                                        int minPrice = _activeFilters['priceRange']['min'] as int;
-                                        int maxPrice = _activeFilters['priceRange']['max'] as int;
-                                        int price = tutor['priceValue'] as int;
-                                        matchesFilters = price >= minPrice && price <= maxPrice;
-                                      }
+                                        // Apply rating filter if active
+                                        if (matchesFilters &&
+                                            _activeFilters.containsKey('rating') &&
+                                            _activeFilters['rating'] is int) {
+                                          matchesFilters = tutor['rating'] >= _activeFilters['rating'];
+                                        }
 
-                                      // Apply rating filter
-                                      if (matchesFilters && _activeFilters.containsKey('rating') &&
-                                          _activeFilters['rating'] is int) {
-                                        matchesFilters = tutor['rating'] >= _activeFilters['rating'];
-                                      }
+                                        return matchesSearch && matchesFilters;
+                                      }).toList();
+                                    } else if (selectedMode == 1) {
+                                      // Search courses
+                                      _filteredCourses = _courses.where((course) {
+                                        bool matchesSearch = course['title']
+                                            .toString()
+                                            .toLowerCase()
+                                            .contains(value.toLowerCase()) ||
+                                            course['instructor']
+                                                .toString()
+                                                .toLowerCase()
+                                                .contains(value.toLowerCase());
 
-                                      return matchesSearch && matchesFilters;
-                                    }).toList();
+                                        // Apply other active filters
+                                        bool matchesFilters = true;
+
+                                        // Apply category filter if active
+                                        if (_activeFilters.containsKey('categories') &&
+                                            _activeFilters['categories'] is List &&
+                                            (_activeFilters['categories'] as List).isNotEmpty) {
+                                          matchesFilters = course['tags'].any((tag) =>
+                                              (_activeFilters['categories'] as List).contains(tag));
+                                        }
+
+                                        // Apply rating filter if active
+                                        if (matchesFilters &&
+                                            _activeFilters.containsKey('rating') &&
+                                            _activeFilters['rating'] is int) {
+                                          matchesFilters = course['rating'] >= _activeFilters['rating'];
+                                        }
+
+                                        return matchesSearch && matchesFilters;
+                                      }).toList();
+                                    }
+                                    // Module search can be added for mode 2
                                   }
                                 });
                               },
@@ -333,6 +439,27 @@ class _SearchState extends State<Search> {
                 ],
               ),
             ),
+
+            // Current mode indicator
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD8F2F6),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'Searching: ${_searchModeLabels[selectedMode]}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF4DA6A6),
+                  ),
+                ),
+              ),
+            ),
+
             // Filter badges (only show when filters are active)
             if (_activeFilters.containsKey('categories') &&
                 _activeFilters['categories'] is List &&
@@ -386,30 +513,16 @@ class _SearchState extends State<Search> {
                   }).toList(),
                 ),
               ),
-            const SizedBox(height: 20),
-            // Tutor List
+
+            const SizedBox(height: 10),
+
+            // Results List - show based on selected mode
             Expanded(
-              child: _filteredTutors.isEmpty
-                  ? const Center(
-                child: Text(
-                  'No tutors match your filters',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                  ),
-                ),
-              )
-                  : ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _filteredTutors.length,
-                itemBuilder: (context, index) {
-                  final tutor = _filteredTutors[index];
-                  return TutorCard(
-                    tutor: tutor,
-                    onViewProfile: () => _navigateToTutorProfile(tutor),
-                  );
-                },
-              ),
+              child: selectedMode == 0
+                  ? _buildTutorsList()
+                  : selectedMode == 1
+                  ? _buildCoursesList()
+                  : const Center(child: Text('Module search coming soon')),
             ),
           ],
         ),
@@ -421,30 +534,77 @@ class _SearchState extends State<Search> {
             selectedIndex = index;
           });
 
-          // Add navigation logic here
+          // Navigation logic
           switch (index) {
             case 0:
-            // Navigate to Home
               Navigator.pushReplacementNamed(context, '/studenthome');
               break;
             case 1:
-            // Already on Search page, do nothing
+            // Already on Search page
               break;
             case 2:
-            // Navigate to Courses
               Navigator.pushReplacementNamed(context, '/courses');
               break;
             case 3:
-            // Navigate to Profile
               Navigator.pushReplacementNamed(context, '/profile');
               break;
           }
         },
         items: _navItems,
-        selectedColor: const Color(0xFFF7941D), // Orange color from your theme
+        selectedColor: const Color(0xFFF7941D),
         unselectedColor: Colors.grey,
         backgroundColor: Colors.black,
       ),
+    );
+  }
+
+  // Build tutors list
+  Widget _buildTutorsList() {
+    return _filteredTutors.isEmpty
+        ? const Center(
+      child: Text(
+        'No tutors match your filters',
+        style: TextStyle(
+          fontSize: 16,
+          color: Colors.grey,
+        ),
+      ),
+    )
+        : ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: _filteredTutors.length,
+      itemBuilder: (context, index) {
+        final tutor = _filteredTutors[index];
+        return TutorCard(
+          tutor: tutor,
+          onViewProfile: () => _navigateToTutorProfile(tutor),
+        );
+      },
+    );
+  }
+
+  // Build courses list
+  Widget _buildCoursesList() {
+    return _filteredCourses.isEmpty
+        ? const Center(
+      child: Text(
+        'No courses match your filters',
+        style: TextStyle(
+          fontSize: 16,
+          color: Colors.grey,
+        ),
+      ),
+    )
+        : ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: _filteredCourses.length,
+      itemBuilder: (context, index) {
+        final course = _filteredCourses[index];
+        return CourseCard(
+          course: course,
+          onViewCourse: () => _navigateToCourseDetails(course),
+        );
+      },
     );
   }
 }

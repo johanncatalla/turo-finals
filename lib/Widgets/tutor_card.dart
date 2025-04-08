@@ -1,5 +1,3 @@
-// Create a new file: lib/Widgets/tutor_card.dart
-
 import 'package:flutter/material.dart';
 
 class TutorCard extends StatelessWidget {
