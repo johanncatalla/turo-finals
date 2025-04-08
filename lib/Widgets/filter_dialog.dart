@@ -1,3 +1,5 @@
+// lib/Widgets/filter_dialog.dart - Updated to show price range for both Tutors and Modules
+
 import 'package:flutter/material.dart';
 
 class FilterDialog extends StatefulWidget {
@@ -22,8 +24,8 @@ class _FilterDialogState extends State<FilterDialog> {
   final List<String> _selectedCategories = [];
 
   // Price range
-  double _minPrice = 98;
-  double _maxPrice = 308;
+  double _minPrice = 0;
+  double _maxPrice = 500;
 
   // Rating
   int _selectedRating = 4;
@@ -143,7 +145,7 @@ class _FilterDialogState extends State<FilterDialog> {
                       child: Text(
                         type,
                         style: const TextStyle(
-                          fontSize: 12, // Updated font size to 12
+                          fontSize: 12,
                         ),
                       ),
                     ),
@@ -192,7 +194,7 @@ class _FilterDialogState extends State<FilterDialog> {
                   child: Text(
                     category,
                     style: const TextStyle(
-                      fontSize: 12, // Updated font size to 12
+                      fontSize: 12,
                     ),
                   ),
                 );
@@ -216,7 +218,7 @@ class _FilterDialogState extends State<FilterDialog> {
                   child: const Text(
                     'More +',
                     style: TextStyle(
-                      fontSize: 12, // Updated font size to 12
+                      fontSize: 12,
                     ),
                   ),
                 ),
@@ -224,8 +226,8 @@ class _FilterDialogState extends State<FilterDialog> {
             ),
             const SizedBox(height: 24),
 
-            // Price Range - Only show for Tutors
-            if (_selectedMode == 0) ...[
+            // Price Range - Show for Tutors and Modules, but not Courses
+            if (_selectedMode == 0 || _selectedMode == 2) ...[
               const Text(
                 'Price Range',
                 style: TextStyle(
@@ -269,7 +271,7 @@ class _FilterDialogState extends State<FilterDialog> {
                         '₱${_minPrice.toInt()}',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 12, // Updated font size to 12
+                          fontSize: 12,
                         ),
                       ),
                     ),
@@ -283,7 +285,7 @@ class _FilterDialogState extends State<FilterDialog> {
                         '₱${_maxPrice.toInt()}',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 12, // Updated font size to 12
+                          fontSize: 12,
                         ),
                       ),
                     ),
@@ -347,7 +349,7 @@ class _FilterDialogState extends State<FilterDialog> {
                     child: const Text(
                       'Clear Filter',
                       style: TextStyle(
-                        fontSize: 12, // Updated font size to 12
+                        fontSize: 12,
                       ),
                     ),
                   ),
@@ -383,7 +385,7 @@ class _FilterDialogState extends State<FilterDialog> {
                     child: const Text(
                       'Apply Filter',
                       style: TextStyle(
-                        fontSize: 12, // Updated font size to 12
+                        fontSize: 12,
                       ),
                     ),
                   ),
