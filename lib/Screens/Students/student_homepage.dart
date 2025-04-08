@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:turo/providers/auth_provider.dart';
 import 'package:turo/role_select.dart';
 import 'package:turo/Widgets/navbar.dart';
+import 'package:turo/Screens/Students/search.dart';
 
 class StudentHomepage extends StatefulWidget {
   const StudentHomepage({super.key});
@@ -141,6 +142,7 @@ class _StudentHomepageState extends State<StudentHomepage> {
     if (index == 1) {
       // Navigate to search page
       // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => SearchScreen()));
+      Navigator.push(context, MaterialPageRoute(builder: (context)=> Search()));
     } else if (index == 2) {
       // Navigate to my courses
       // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => MyCoursesScreen()));
@@ -193,10 +195,9 @@ class _StudentHomepageState extends State<StudentHomepage> {
               selectedIndex: _selectedMenuIndex,
               onItemSelected: _handleNavigation,
               items: _navItems,
-              // You can customize colors if needed:
-              // selectedColor: Colors.orange,
-              // unselectedColor: Colors.white60,
-              // backgroundColor: Colors.black,
+              selectedColor: const Color(0xFFF7941D), // Orange color from your theme
+              unselectedColor: Colors.grey,
+              backgroundColor: Colors.black,
             ),
           ),
         ],

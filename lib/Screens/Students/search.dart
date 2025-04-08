@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../Widgets/navbar.dart';
+
 class Search extends StatefulWidget {
   const Search({super.key});
 
@@ -9,8 +11,17 @@ class Search extends StatefulWidget {
 
 class _SearchState extends State<Search> {
   int selectedMode = 0;
+  int selectedIndex = 1; // Search tab is selected (index 1)
   final List<String> _searchMode = ['Tutor', 'Course', 'Module'];
   final TextEditingController _searchController = TextEditingController();
+
+  // Define nav items for your custom navbar
+  final List<NavBarItem> _navItems = [
+    NavBarItem(icon: Icons.home, label: 'Home'),
+    NavBarItem(icon: Icons.search, label: 'Search'),
+    NavBarItem(icon: Icons.description_outlined, label: 'Courses'),
+    NavBarItem(icon: Icons.person_outline, label: 'Profile'),
+  ];
 
   // Dummy data for list of tutors
   final List<Map<String, dynamic>> _tutors = [
@@ -166,29 +177,18 @@ class _SearchState extends State<Search> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFFF7941D),
-        unselectedItemColor: Colors.grey,
-        currentIndex: 1, // Search tab is selected
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.description_outlined),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: '',
-          ),
-        ],
+      bottomNavigationBar: NavBar(
+        selectedIndex: selectedIndex,
+        onItemSelected: (index) {
+          setState(() {
+            selectedIndex = index;
+          });
+          //
+        },
+        items: _navItems,
+        selectedColor: const Color(0xFFF7941D), // Orange color from your theme
+        unselectedColor: Colors.grey,
+        backgroundColor: Colors.black,
       ),
     );
   }
