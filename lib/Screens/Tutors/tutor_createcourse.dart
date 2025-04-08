@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
+/* 
+TODO: 
+- add invite function on lecturer tab (kahit interactive button lng)    - Not yet
+- changing course title text form to dropdown menu                      - Goods
+- Polish to look more like Figma prototype                              - Not yet
+*/
+
 // Placeholder enum for tabs
 enum CourseTab { lecturer, materials }
 
@@ -14,10 +21,12 @@ class CreateCourseScreen extends StatefulWidget {
 
 class _CreateCourseScreenState extends State<CreateCourseScreen>
     with SingleTickerProviderStateMixin {
+  String? _selectedCourse;
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final Set<String> _selectedDays = {};
 
+  // --- used for time selection functionalities ---
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
   late TabController _tabController;
@@ -91,7 +100,9 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
       });
     }
   }
+  // --- functionalities end ---
 
+  // Class Schedule - Day Toggle buttons
   Widget _buildDayToggle(String day) {
     final isSelected = _selectedDays.contains(day);
     return GestureDetector(
@@ -215,6 +226,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
     );
   }
 
+  // Lecturer Tab content (invite not yet functional)
   Widget _buildLecturerTabContent() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 8.0),
@@ -244,6 +256,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
     );
   }
 
+  // Materials tab content (dropbox not yet functional)
   Widget _buildMaterialsTabContent() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24.0),
@@ -286,6 +299,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
     );
   }
 
+  // Calendar
   Widget _buildCalendarSection() {
     return Column(
       children: [
@@ -373,6 +387,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
     );
   }
 
+  // appbar & order of widgets
   @override
   Widget build(BuildContext context) {
     final Color primaryColor =
@@ -435,7 +450,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
               ),
             ),
 
-            // Course Title
+            // Course Title (TO CHANGE: TEXTFIELD -> DROPDOWN MENU)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
@@ -446,13 +461,41 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: _titleController,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12.0,
+                      vertical: 14.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _selectedCourse ?? 'Select course',
+                          style: TextStyle(
+                            color:
+                                _selectedCourse == null
+                                    ? Colors.grey[500]
+                                    : Colors.black,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                      ],
+                    ),
+                  ),
+                  /*
+                  DropdownButtonFormField<String>(
+                    value: _selectedCourse,
+                    hint: Text('Select course', style: TextStyle(color: Colors.grey[500])),
                     decoration: InputDecoration(
-                      hintText: 'Type course title',
-                      hintStyle: TextStyle(color: Colors.grey[500]),
                       filled: true,
                       fillColor: Colors.grey[100],
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 14.0),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(color: Colors.grey[300]!),
@@ -461,16 +504,20 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(color: Colors.grey[300]!),
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: primaryColor),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12.0,
-                        vertical: 14.0,
-                      ),
                     ),
+                    items: ['Mathematics 101', 'History of Art', 'Introduction to Programming']
+                        .map((label) => DropdownMenuItem(
+                              value: label,
+                              child: Text(label),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedCourse = value;
+                      });
+                    },
                   ),
+                  */
                 ],
               ),
             ),
@@ -547,7 +594,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: SizedBox(
-                height: 150, // Adjust height as needed
+                height: 150,
                 child: TabBarView(
                   controller: _tabController,
                   children: [
@@ -584,7 +631,6 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
               elevation: 5,
             ),
             onPressed: () {
-              // (Save logic remains the same)
               final String courseTitle = _titleController.text;
               final String courseDescription = _descriptionController.text;
               final String startTimeStr = _formatTimeOfDay(_startTime);
@@ -620,6 +666,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 }
 
+// will comment this after pull (pls)
 void main() {
   runApp(const MaterialApp(home: CreateCourseScreen()));
 }
