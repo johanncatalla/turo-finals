@@ -1,7 +1,9 @@
+// Updated Search.dart file with filter integration
+
 import 'package:flutter/material.dart';
 import 'package:turo/Screens/Students/student_homepage.dart';
-
 import '../../Widgets/navbar.dart';
+import '../../Widgets/filter_dialog.dart'; // Import the new filter dialog
 
 class Search extends StatefulWidget {
   const Search({super.key});
@@ -15,6 +17,9 @@ class _SearchState extends State<Search> {
   int selectedIndex = 1; // Navigation currently at 1
   final List<String> _searchMode = ['Tutor', 'Course', 'Module'];
   final TextEditingController _searchController = TextEditingController();
+
+  // Filter parameters
+  Map<String, dynamic> _activeFilters = {};
 
   // Define nav items for your custom navbar
   final List<NavBarItem> _navItems = [
@@ -31,6 +36,7 @@ class _SearchState extends State<Search> {
       'image': 'assets/joshua.png',
       'verified': true,
       'price': '₱100/hr',
+      'priceValue': 100,
       'tags': ['English', 'Filipino'],
       'experience': '2+',
       'rating': 4.8,
@@ -41,6 +47,7 @@ class _SearchState extends State<Search> {
       'image': 'assets/joshua.png',
       'verified': true,
       'price': '₱100/hr',
+      'priceValue': 100,
       'tags': ['Math', 'Programming'],
       'experience': '2+',
       'rating': 4.8,
@@ -50,7 +57,8 @@ class _SearchState extends State<Search> {
       'name': 'Andres Muhlach',
       'image': 'assets/joshua.png',
       'verified': true,
-      'price': '₱100/hr',
+      'price': '₱200/hr',
+      'priceValue': 200,
       'tags': ['Math', 'Programming'],
       'experience': '2+',
       'rating': 4.8,
@@ -60,32 +68,117 @@ class _SearchState extends State<Search> {
       'name': 'Brent Manalo',
       'image': 'assets/joshua.png',
       'verified': true,
-      'price': '₱100/hr',
+      'price': '₱150/hr',
+      'priceValue': 150,
       'tags': ['English', 'Programming'],
       'experience': '2+',
       'rating': 4.8,
       'bio': 'I\'m Juan De La Cruz, a multi-passionate CS student with a deep fascination for computers and technology. Currently wor...',
     },
+    {
+      'name': 'Carlos Santos',
+      'image': 'assets/joshua.png',
+      'verified': true,
+      'price': '₱300/hr',
+      'priceValue': 300,
+      'tags': ['Science', 'Math'],
+      'experience': '3+',
+      'rating': 4.5,
+      'bio': 'Experienced science and math tutor with a background in engineering. I specialize in making complex concepts accessible to students...',
+    },
+    {
+      'name': 'Maria Reyes',
+      'image': 'assets/joshua.png',
+      'verified': true,
+      'price': '₱250/hr',
+      'priceValue': 250,
+      'tags': ['Filipino', 'Journalism'],
+      'experience': '4+',
+      'rating': 4.9,
+      'bio': 'Former journalist with a passion for teaching language and writing skills. I help students improve their communication abilities...',
+    },
   ];
 
-  // Dummy Data for Courses (can be added later)
-  // Dummy data for modules (can be added later)
+  // Filtered tutors list
+  List<Map<String, dynamic>> _filteredTutors = [];
 
-  // Add a method to handle navigation
-  void _handleNavigation(int index) {
-    // Update your state
-    print(index);
-    // Add any navigation logic here
-    if (index == 0) {
-      // Navigate to search page
-      Navigator.push(context, MaterialPageRoute(builder: (context) => StudentHomepage()));
-    } else if (index == 2) {
-      // Navigate to my courses
-      // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => MyCoursesScreen()));
-    } else if (index == 3) {
-      // Navigate to profile
-      // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => ProfileScreen()));
-    }
+  @override
+  void initState() {
+    super.initState();
+    // Initialize filtered tutors with all tutors
+    _filteredTutors = List.from(_tutors);
+  }
+
+  // Handle filter application
+  void _applyFilters(Map<String, dynamic> filters) {
+    setState(() {
+      _activeFilters = filters;
+
+      // Start with all tutors
+      _filteredTutors = List.from(_tutors);
+
+      // Apply category filter
+      if (filters.containsKey('categories') &&
+          filters['categories'] is List &&
+          (filters['categories'] as List).isNotEmpty) {
+
+        _filteredTutors = _filteredTutors.where((tutor) {
+          // Check if any of the tutor's tags match any of the selected categories
+          return tutor['tags'].any((tag) =>
+              (filters['categories'] as List).contains(tag));
+        }).toList();
+      }
+
+      // Apply price range filter
+      if (filters.containsKey('priceRange') && filters['priceRange'] is Map) {
+        int minPrice = filters['priceRange']['min'] as int;
+        int maxPrice = filters['priceRange']['max'] as int;
+
+        _filteredTutors = _filteredTutors.where((tutor) {
+          // Extract numeric price value
+          int price = tutor['priceValue'] as int;
+          return price >= minPrice && price <= maxPrice;
+        }).toList();
+      }
+
+      // Apply rating filter
+      if (filters.containsKey('rating') && filters['rating'] is int) {
+        int minRating = filters['rating'] as int;
+
+        _filteredTutors = _filteredTutors.where((tutor) {
+          double rating = tutor['rating'] as double;
+          return rating >= minRating;
+        }).toList();
+      }
+    });
+  }
+
+  // Show filter dialog as bottom sheet
+  void _showFilterDialog() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black.withOpacity(0.5),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation1, animation2) => Container(),
+      transitionBuilder: (context, animation1, animation2, child) {
+        final curvedAnimation = CurvedAnimation(
+          parent: animation1,
+          curve: Curves.easeInOut,
+        );
+
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 1), // Start from bottom
+            end: Offset.zero,
+          ).animate(curvedAnimation),
+          child: FilterDialog(
+            onApplyFilter: _applyFilters,
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -160,6 +253,56 @@ class _SearchState extends State<Search> {
                                 border: InputBorder.none,
                                 hintStyle: TextStyle(color: Colors.grey),
                               ),
+                              onChanged: (value) {
+                                // Add search functionality
+                                setState(() {
+                                  if (value.isEmpty) {
+                                    // If search is empty, show filtered tutors based on active filters
+                                    _applyFilters(_activeFilters);
+                                  } else {
+                                    // Filter tutors by name and apply active filters
+                                    _filteredTutors = _tutors.where((tutor) {
+                                      bool matchesSearch = tutor['name']
+                                          .toString()
+                                          .toLowerCase()
+                                          .contains(value.toLowerCase());
+
+                                      // Apply other filters
+                                      bool matchesFilters = true;
+
+                                      // Skip filtering if no active filters
+                                      if (_activeFilters.isEmpty) {
+                                        return matchesSearch;
+                                      }
+
+                                      // Apply category filter
+                                      if (_activeFilters.containsKey('categories') &&
+                                          _activeFilters['categories'] is List &&
+                                          (_activeFilters['categories'] as List).isNotEmpty) {
+                                        matchesFilters = tutor['tags'].any((tag) =>
+                                            (_activeFilters['categories'] as List).contains(tag));
+                                      }
+
+                                      // Apply price filter
+                                      if (matchesFilters && _activeFilters.containsKey('priceRange') &&
+                                          _activeFilters['priceRange'] is Map) {
+                                        int minPrice = _activeFilters['priceRange']['min'] as int;
+                                        int maxPrice = _activeFilters['priceRange']['max'] as int;
+                                        int price = tutor['priceValue'] as int;
+                                        matchesFilters = price >= minPrice && price <= maxPrice;
+                                      }
+
+                                      // Apply rating filter
+                                      if (matchesFilters && _activeFilters.containsKey('rating') &&
+                                          _activeFilters['rating'] is int) {
+                                        matchesFilters = tutor['rating'] >= _activeFilters['rating'];
+                                      }
+
+                                      return matchesSearch && matchesFilters;
+                                    }).toList();
+                                  }
+                                });
+                              },
                             ),
                           ),
                         ],
@@ -167,27 +310,93 @@ class _SearchState extends State<Search> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4DA6A6),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: const Icon(
-                      Icons.filter_alt_outlined,
-                      color: Colors.white,
+                  InkWell(
+                    onTap: _showFilterDialog,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4DA6A6),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: const Icon(
+                        Icons.filter_alt_outlined,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
+            // Filter badges (only show when filters are active)
+            if (_activeFilters.containsKey('categories') &&
+                _activeFilters['categories'] is List &&
+                (_activeFilters['categories'] as List).isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: (_activeFilters['categories'] as List).map<Widget>((category) {
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          // Remove this category from filters
+                          List categories = List.from(_activeFilters['categories']);
+                          categories.remove(category);
+                          _activeFilters = {
+                            ..._activeFilters,
+                            'categories': categories,
+                          };
+                          // Reapply filters
+                          _applyFilters(_activeFilters);
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD8F2F6),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              category.toString(),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF4DA6A6),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.close,
+                              size: 14,
+                              color: Color(0xFF4DA6A6),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
             const SizedBox(height: 20),
             Expanded(
-              child: ListView.builder(
+              child: _filteredTutors.isEmpty
+                  ? const Center(
+                child: Text(
+                  'No tutors match your filters',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                  ),
+                ),
+              )
+                  : ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _tutors.length,
+                itemCount: _filteredTutors.length,
                 itemBuilder: (context, index) {
-                  final tutor = _tutors[index];
+                  final tutor = _filteredTutors[index];
                   return TutorCard(tutor: tutor);
                 },
               ),
@@ -401,7 +610,6 @@ class TutorCard extends StatelessWidget {
               ),
             ],
           ),
-
         ],
       ),
     );
