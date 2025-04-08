@@ -1,9 +1,8 @@
-// Updated Search.dart file with filter integration
-
 import 'package:flutter/material.dart';
 import 'package:turo/Screens/Students/student_homepage.dart';
 import '../../Widgets/navbar.dart';
-import '../../Widgets/filter_dialog.dart'; // Import the new filter dialog
+import '../../Widgets/filter_dialog.dart'; // Import the filter dialog
+import '../../Widgets/tutor_card.dart'; // Import the reusable TutorCard
 
 class Search extends StatefulWidget {
   const Search({super.key});
@@ -179,6 +178,13 @@ class _SearchState extends State<Search> {
         );
       },
     );
+  }
+
+  // Navigate to tutor profile
+  void _navigateToTutorProfile(Map<String, dynamic> tutor) {
+    // Implement navigation to tutor profile
+    // For example: Navigator.pushNamed(context, '/tutor-profile', arguments: tutor);
+    print('Navigate to profile for: ${tutor['name']}');
   }
 
   @override
@@ -381,6 +387,7 @@ class _SearchState extends State<Search> {
                 ),
               ),
             const SizedBox(height: 20),
+            // Tutor List
             Expanded(
               child: _filteredTutors.isEmpty
                   ? const Center(
@@ -397,7 +404,10 @@ class _SearchState extends State<Search> {
                 itemCount: _filteredTutors.length,
                 itemBuilder: (context, index) {
                   final tutor = _filteredTutors[index];
-                  return TutorCard(tutor: tutor);
+                  return TutorCard(
+                    tutor: tutor,
+                    onViewProfile: () => _navigateToTutorProfile(tutor),
+                  );
                 },
               ),
             ),
@@ -434,183 +444,6 @@ class _SearchState extends State<Search> {
         selectedColor: const Color(0xFFF7941D), // Orange color from your theme
         unselectedColor: Colors.grey,
         backgroundColor: Colors.black,
-      ),
-    );
-  }
-}
-
-class TutorCard extends StatelessWidget {
-  final Map<String, dynamic> tutor;
-
-  const TutorCard({
-    super.key,
-    required this.tutor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 30,
-                backgroundImage: AssetImage(tutor['image']),
-                backgroundColor: Colors.grey.shade300,
-                child: tutor['image'].startsWith('assets/')
-                    ? null
-                    : Icon(Icons.person, size: 30, color: Colors.grey.shade700),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Text(
-                                tutor['name'],
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(width: 5),
-                              if (tutor['verified'])
-                                const Icon(
-                                  Icons.verified,
-                                  color: Color(0xFF4DA6A6),
-                                  size: 15,
-                                ),
-                            ],
-                          ),
-                        ),
-                        Text(
-                          tutor['price'],
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFF7941D),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Wrap(
-                      spacing: 5,
-                      runSpacing: 5,
-                      children: [
-                        ...List.generate(
-                          tutor['tags'].length,
-                              (i) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFD8F2F6),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            child: Text(
-                              tutor['tags'][i],
-                              style: const TextStyle(
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF3F8E9B),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFD8F2F6),
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Text(
-                            tutor['experience'],
-                            style: const TextStyle(
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF3F8E9B)
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFAE6CC),
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.star,
-                                color: Color(0xFFF7941D),
-                                size: 12,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                tutor['rating'].toString(),
-                                style: const TextStyle(
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.bold
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      tutor['bio'],
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black87,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        backgroundColor: const Color(0xFFD8F2F6),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        minimumSize: const Size(double.infinity, 0),
-                      ),
-                      onPressed: () {},
-                      child: const Text(
-                        'View Profile',
-                        style: TextStyle(
-                          color: Color(0xFF4DA6A6),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
