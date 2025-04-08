@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../Widgets/module_card.dart';
 import '../../Widgets/navbar.dart';
 import '../../Widgets/filter_dialog.dart';
 import '../../Widgets/tutor_card.dart';
@@ -125,9 +126,73 @@ class _SearchState extends State<Search> {
     },
   ];
 
+  final List<Map<String, dynamic>> _modules = [
+    {
+      'title': 'Basics of Journalism',
+      'publisher': 'Mr. J Perez',
+      'price': '₱100/hr',
+      'priceValue': 100,
+      'tags': ['English', 'Filipino'],
+      'experience': '2+',
+      'rating': 4.8,
+      'description': 'Description of the module goes here. We\'ll be showing two lines of description only...',
+    },
+    {
+      'title': 'Introduction to Calculus',
+      'publisher': 'Dr. Ricardo Dalisay',
+      'price': '₱85/hr',
+      'priceValue': 85,
+      'tags': ['Math', 'Advanced'],
+      'experience': '3+',
+      'rating': 4.9,
+      'description': 'Learn the fundamentals of calculus including limits, derivatives, and integrals with practical examples and exercises.',
+    },
+    {
+      'title': 'English Grammar Essentials',
+      'publisher': 'Prof. Elena Santos',
+      'price': '₱75/hr',
+      'priceValue': 75,
+      'tags': ['English', 'Grammar'],
+      'experience': '5+',
+      'rating': 4.7,
+      'description': 'Master essential grammar rules and improve your writing skills with this comprehensive module covering parts of speech, sentence structure, and more.',
+    },
+    {
+      'title': 'Chemical Reactions and Equations',
+      'publisher': 'Prof. Maria Reyes',
+      'price': '₱90/hr',
+      'priceValue': 90,
+      'tags': ['Science', 'Chemistry'],
+      'experience': '4+',
+      'rating': 4.8,
+      'description': 'Explore the world of chemical reactions, learn to balance equations, and understand reaction types with interactive examples.',
+    },
+    {
+      'title': 'Python Data Structures',
+      'publisher': 'Engr. Juan Dela Cruz',
+      'price': '₱120/hr',
+      'priceValue': 120,
+      'tags': ['Programming', 'Computer Science'],
+      'experience': '3+',
+      'rating': 4.9,
+      'description': 'Dive deep into Python data structures including lists, dictionaries, sets, and tuples with practical coding exercises and projects.',
+    },
+    {
+      'title': 'Filipino Literature Classics',
+      'publisher': 'Dr. Jose Rizal',
+      'price': '₱65/hr',
+      'priceValue': 65,
+      'tags': ['Filipino', 'Literature'],
+      'experience': '6+',
+      'rating': 4.6,
+      'description': 'Explore the rich tradition of Filipino literature through classic works, understanding cultural context and literary elements.',
+    },
+  ];
+
   // Filtered lists
   List<Map<String, dynamic>> _filteredTutors = [];
   List<Map<String, dynamic>> _filteredCourses = [];
+  List<Map<String, dynamic>> _filteredModules = [];
 
   @override
   void initState() {
@@ -135,6 +200,7 @@ class _SearchState extends State<Search> {
     // Initialize filtered lists
     _filteredTutors = List.from(_tutors);
     _filteredCourses = List.from(_courses);
+    _filteredModules = List.from(_modules);
   }
 
   // Handle filter application
@@ -213,6 +279,44 @@ class _SearchState extends State<Search> {
         _searchController.clear();
       }
       // Module filtering can be added for mode 2
+      else if (selectedMode == 2) {
+        // Filter modules
+        _filteredModules = List.from(_modules);
+
+        // Apply category filter
+        if (filters.containsKey('categories') &&
+            filters['categories'] is List &&
+            (filters['categories'] as List).isNotEmpty) {
+          _filteredModules = _filteredModules.where((module) {
+            return module['tags'].any((tag) =>
+                (filters['categories'] as List).contains(tag));
+          }).toList();
+        }
+
+        // Apply price range filter if available
+        if (filters.containsKey('priceRange') && filters['priceRange'] is Map) {
+          int minPrice = filters['priceRange']['min'] as int;
+          int maxPrice = filters['priceRange']['max'] as int;
+
+          _filteredModules = _filteredModules.where((module) {
+            int price = module['priceValue'] as int;
+            return price >= minPrice && price <= maxPrice;
+          }).toList();
+        }
+
+        // Apply rating filter
+        if (filters.containsKey('rating') && filters['rating'] is int) {
+          int minRating = filters['rating'] as int;
+
+          _filteredModules = _filteredModules.where((module) {
+            double rating = module['rating'] as double;
+            return rating >= minRating;
+          }).toList();
+        }
+
+        // Clear search field
+        _searchController.clear();
+      }
     });
   }
 
@@ -221,7 +325,9 @@ class _SearchState extends State<Search> {
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
-      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierLabel: MaterialLocalizations
+          .of(context)
+          .modalBarrierDismissLabel,
       barrierColor: Colors.black.withOpacity(0.5),
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, animation1, animation2) => Container(),
@@ -257,6 +363,11 @@ class _SearchState extends State<Search> {
     print('Navigate to course: ${course['title']}');
   }
 
+  void _navigateToModuleDetails(Map<String, dynamic> module) {
+    // Implement navigation to module details
+    print('Navigate to module: ${module['title']}');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -278,7 +389,11 @@ class _SearchState extends State<Search> {
                   ),
                   children: [
                     TextSpan(
-                      text: selectedMode == 0 ? 'best tutor' : 'best course',
+                      text: selectedMode == 0
+                          ? 'best tutor'
+                          : selectedMode == 1
+                          ? 'best course'
+                          : 'best module',
                       style: const TextStyle(
                         color: Color(0xFF4DA6A6),
                       ),
@@ -300,7 +415,9 @@ class _SearchState extends State<Search> {
               child: Text(
                 selectedMode == 0
                     ? 'Customize the search filter to find a tutor that match your needs.'
-                    : 'Customize the search filter to find a course that match your needs.',
+                    : selectedMode == 1
+                    ? 'Customize the search filter to find a course that match your needs.'
+                    : 'Customize the search filter to find a module that match your needs.',
                 style: const TextStyle(
                   fontSize: 16,
                   color: Colors.black87,
@@ -352,66 +469,142 @@ class _SearchState extends State<Search> {
                                         bool matchesFilters = true;
 
                                         // Apply category filter if active
-                                        if (_activeFilters.containsKey('categories') &&
+                                        if (_activeFilters.containsKey(
+                                            'categories') &&
                                             _activeFilters['categories'] is List &&
-                                            (_activeFilters['categories'] as List).isNotEmpty) {
-                                          matchesFilters = tutor['tags'].any((tag) =>
-                                              (_activeFilters['categories'] as List).contains(tag));
+                                            (_activeFilters['categories'] as List)
+                                                .isNotEmpty) {
+                                          matchesFilters =
+                                              tutor['tags'].any((tag) =>
+                                                  (_activeFilters['categories'] as List)
+                                                      .contains(tag));
                                         }
 
                                         // Apply price filter if active
                                         if (matchesFilters &&
-                                            _activeFilters.containsKey('priceRange') &&
+                                            _activeFilters.containsKey(
+                                                'priceRange') &&
                                             _activeFilters['priceRange'] is Map) {
                                           int minPrice = _activeFilters['priceRange']['min'] as int;
                                           int maxPrice = _activeFilters['priceRange']['max'] as int;
                                           int price = tutor['priceValue'] as int;
-                                          matchesFilters = price >= minPrice && price <= maxPrice;
+                                          matchesFilters = price >= minPrice &&
+                                              price <= maxPrice;
                                         }
 
                                         // Apply rating filter if active
                                         if (matchesFilters &&
-                                            _activeFilters.containsKey('rating') &&
+                                            _activeFilters.containsKey(
+                                                'rating') &&
                                             _activeFilters['rating'] is int) {
-                                          matchesFilters = tutor['rating'] >= _activeFilters['rating'];
+                                          matchesFilters = tutor['rating'] >=
+                                              _activeFilters['rating'];
                                         }
 
                                         return matchesSearch && matchesFilters;
                                       }).toList();
                                     } else if (selectedMode == 1) {
                                       // Search courses
-                                      _filteredCourses = _courses.where((course) {
-                                        bool matchesSearch = course['title']
-                                            .toString()
-                                            .toLowerCase()
-                                            .contains(value.toLowerCase()) ||
-                                            course['instructor']
+                                      _filteredCourses =
+                                          _courses.where((course) {
+                                            bool matchesSearch = course['title']
                                                 .toString()
                                                 .toLowerCase()
-                                                .contains(value.toLowerCase());
+                                                .contains(
+                                                value.toLowerCase()) ||
+                                                course['instructor']
+                                                    .toString()
+                                                    .toLowerCase()
+                                                    .contains(
+                                                    value.toLowerCase());
 
-                                        // Apply other active filters
-                                        bool matchesFilters = true;
+                                            // Apply other active filters
+                                            bool matchesFilters = true;
 
-                                        // Apply category filter if active
-                                        if (_activeFilters.containsKey('categories') &&
-                                            _activeFilters['categories'] is List &&
-                                            (_activeFilters['categories'] as List).isNotEmpty) {
-                                          matchesFilters = course['tags'].any((tag) =>
-                                              (_activeFilters['categories'] as List).contains(tag));
-                                        }
+                                            // Apply category filter if active
+                                            if (_activeFilters.containsKey(
+                                                'categories') &&
+                                                _activeFilters['categories'] is List &&
+                                                (_activeFilters['categories'] as List)
+                                                    .isNotEmpty) {
+                                              matchesFilters =
+                                                  course['tags'].any((tag) =>
+                                                      (_activeFilters['categories'] as List)
+                                                          .contains(tag));
+                                            }
 
-                                        // Apply rating filter if active
-                                        if (matchesFilters &&
-                                            _activeFilters.containsKey('rating') &&
-                                            _activeFilters['rating'] is int) {
-                                          matchesFilters = course['rating'] >= _activeFilters['rating'];
-                                        }
+                                            // Apply rating filter if active
+                                            if (matchesFilters &&
+                                                _activeFilters.containsKey(
+                                                    'rating') &&
+                                                _activeFilters['rating'] is int) {
+                                              matchesFilters =
+                                                  course['rating'] >=
+                                                      _activeFilters['rating'];
+                                            }
 
-                                        return matchesSearch && matchesFilters;
-                                      }).toList();
+                                            return matchesSearch &&
+                                                matchesFilters;
+                                          }).toList();
                                     }
                                     // Module search can be added for mode 2
+                                    else if (selectedMode == 2) {
+                                      // Search modules
+                                      _filteredModules =
+                                          _modules.where((module) {
+                                            bool matchesSearch = module['title']
+                                                .toString()
+                                                .toLowerCase()
+                                                .contains(
+                                                value.toLowerCase()) ||
+                                                module['publisher']
+                                                    .toString()
+                                                    .toLowerCase()
+                                                    .contains(
+                                                    value.toLowerCase());
+
+                                            // Apply other active filters
+                                            bool matchesFilters = true;
+
+                                            // Apply category filter if active
+                                            if (_activeFilters.containsKey(
+                                                'categories') &&
+                                                _activeFilters['categories'] is List &&
+                                                (_activeFilters['categories'] as List)
+                                                    .isNotEmpty) {
+                                              matchesFilters =
+                                                  module['tags'].any((tag) =>
+                                                      (_activeFilters['categories'] as List)
+                                                          .contains(tag));
+                                            }
+
+                                            // Apply price filter if active
+                                            if (matchesFilters &&
+                                                _activeFilters.containsKey(
+                                                    'priceRange') &&
+                                                _activeFilters['priceRange'] is Map) {
+                                              int minPrice = _activeFilters['priceRange']['min'] as int;
+                                              int maxPrice = _activeFilters['priceRange']['max'] as int;
+                                              int price = module['priceValue'] as int;
+                                              matchesFilters =
+                                                  price >= minPrice &&
+                                                      price <= maxPrice;
+                                            }
+
+                                            // Apply rating filter if active
+                                            if (matchesFilters &&
+                                                _activeFilters.containsKey(
+                                                    'rating') &&
+                                                _activeFilters['rating'] is int) {
+                                              matchesFilters =
+                                                  module['rating'] >=
+                                                      _activeFilters['rating'];
+                                            }
+
+                                            return matchesSearch &&
+                                                matchesFilters;
+                                          }).toList();
+                                    }
                                   }
                                 });
                               },
@@ -444,7 +637,8 @@ class _SearchState extends State<Search> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: const Color(0xFFD8F2F6),
                   borderRadius: BorderRadius.circular(20),
@@ -465,16 +659,19 @@ class _SearchState extends State<Search> {
                 _activeFilters['categories'] is List &&
                 (_activeFilters['categories'] as List).isNotEmpty)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 10),
                 child: Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: (_activeFilters['categories'] as List).map<Widget>((category) {
+                  children: (_activeFilters['categories'] as List).map<Widget>((
+                      category) {
                     return GestureDetector(
                       onTap: () {
                         setState(() {
                           // Remove this category from filters
-                          List categories = List.from(_activeFilters['categories']);
+                          List categories = List.from(
+                              _activeFilters['categories']);
                           categories.remove(category);
                           _activeFilters = {
                             ..._activeFilters,
@@ -485,7 +682,8 @@ class _SearchState extends State<Search> {
                         });
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: const Color(0xFFD8F2F6),
                           borderRadius: BorderRadius.circular(20),
@@ -522,7 +720,7 @@ class _SearchState extends State<Search> {
                   ? _buildTutorsList()
                   : selectedMode == 1
                   ? _buildCoursesList()
-                  : const Center(child: Text('Module search coming soon')),
+                  : _buildModulesList(),
             ),
           ],
         ),
@@ -606,5 +804,51 @@ class _SearchState extends State<Search> {
         );
       },
     );
+  }
+
+  Widget _buildModulesList() {
+    return _filteredModules.isEmpty
+        ? const Center(
+      child: Text(
+        'No modules match your filters',
+        style: TextStyle(
+          fontSize: 16,
+          color: Colors.grey,
+        ),
+      ),
+    )
+        : ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: _filteredModules.length,
+      itemBuilder: (context, index) {
+        final module = _filteredModules[index];
+        return ModuleCard(
+          module: module,
+          onPreviewModule: () => _previewModule(module),
+        );
+      },
+    );
+  }
+
+  // Add a method to handle module preview
+  void _previewModule(Map<String, dynamic> module) {
+    // Implement preview functionality
+    print('Preview module: ${module['title']}');
+
+    // Show a snackbar indicating preview is in progress
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Previewing ${module['title']}...'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: const Color(0xFF4DA6A6),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+
+    // You would typically navigate to a preview screen or open a modal
+    // Navigator.push(context, MaterialPageRoute(builder: (context) => ModulePreviewScreen(module: module)));
   }
 }
