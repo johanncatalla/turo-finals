@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:turo/Screens/Students/student_homepage.dart';
 
 import '../../Widgets/navbar.dart';
 
@@ -11,7 +12,7 @@ class Search extends StatefulWidget {
 
 class _SearchState extends State<Search> {
   int selectedMode = 0;
-  int selectedIndex = 1; // Search tab is selected (index 1)
+  int selectedIndex = 1; // Navigation currently at 1
   final List<String> _searchMode = ['Tutor', 'Course', 'Module'];
   final TextEditingController _searchController = TextEditingController();
 
@@ -69,6 +70,23 @@ class _SearchState extends State<Search> {
 
   // Dummy Data for Courses (can be added later)
   // Dummy data for modules (can be added later)
+
+  // Add a method to handle navigation
+  void _handleNavigation(int index) {
+    // Update your state
+    print(index);
+    // Add any navigation logic here
+    if (index == 0) {
+      // Navigate to search page
+      Navigator.push(context, MaterialPageRoute(builder: (context) => StudentHomepage()));
+    } else if (index == 2) {
+      // Navigate to my courses
+      // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => MyCoursesScreen()));
+    } else if (index == 3) {
+      // Navigate to profile
+      // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => ProfileScreen()));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -183,7 +201,25 @@ class _SearchState extends State<Search> {
           setState(() {
             selectedIndex = index;
           });
-          //
+
+          // Add navigation logic here
+          switch (index) {
+            case 0:
+            // Navigate to Home
+              Navigator.pushReplacementNamed(context, '/studenthome');
+              break;
+            case 1:
+            // Already on Search page, do nothing
+              break;
+            case 2:
+            // Navigate to Courses
+              Navigator.pushReplacementNamed(context, '/courses');
+              break;
+            case 3:
+            // Navigate to Profile
+              Navigator.pushReplacementNamed(context, '/profile');
+              break;
+          }
         },
         items: _navItems,
         selectedColor: const Color(0xFFF7941D), // Orange color from your theme

@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:turo/providers/auth_provider.dart';
 import 'package:turo/role_select.dart';
 import 'package:turo/Widgets/navbar.dart';
-import 'package:turo/Screens/Students/search.dart';
 
 class StudentHomepage extends StatefulWidget {
   const StudentHomepage({super.key});
@@ -133,22 +132,28 @@ class _StudentHomepageState extends State<StudentHomepage> {
 
   // Add a method to handle navigation
   void _handleNavigation(int index) {
-    // Update your state
+    // Update the selected index state
     setState(() {
       _selectedMenuIndex = index;
     });
 
-    // Add any navigation logic here
-    if (index == 1) {
+    // Navigation logic using named routes
+    switch (index) {
+      case 0:
+      // Already on Home page, don't navigate
+        break;
+      case 1:
       // Navigate to search page
-      // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => SearchScreen()));
-      Navigator.push(context, MaterialPageRoute(builder: (context)=> Search()));
-    } else if (index == 2) {
-      // Navigate to my courses
-      // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => MyCoursesScreen()));
-    } else if (index == 3) {
-      // Navigate to profile
-      // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => ProfileScreen()));
+        Navigator.pushReplacementNamed(context, '/search');
+        break;
+      case 2:
+      // Navigate to my courses (if route exists)
+        Navigator.pushReplacementNamed(context, '/courses');
+        break;
+      case 3:
+      // Navigate to profile (if route exists)
+        Navigator.pushReplacementNamed(context, '/profile');
+        break;
     }
   }
 
@@ -195,9 +200,10 @@ class _StudentHomepageState extends State<StudentHomepage> {
               selectedIndex: _selectedMenuIndex,
               onItemSelected: _handleNavigation,
               items: _navItems,
-              selectedColor: const Color(0xFFF7941D), // Orange color from your theme
-              unselectedColor: Colors.grey,
-              backgroundColor: Colors.black,
+              // You can customize colors if needed:
+              // selectedColor: Colors.orange,
+              // unselectedColor: Colors.white60,
+              // backgroundColor: Colors.black,
             ),
           ),
         ],
