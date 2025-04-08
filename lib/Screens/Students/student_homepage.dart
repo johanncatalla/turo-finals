@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:turo/providers/auth_provider.dart';
 import 'package:turo/role_select.dart';
-import 'package:turo/Screens/Students/search.dart';
+import 'package:turo/Widgets/navbar.dart';
 
 class StudentHomepage extends StatefulWidget {
   const StudentHomepage({super.key});
@@ -18,6 +18,14 @@ class _StudentHomepageState extends State<StudentHomepage> {
   
   // Selected menu item
   int _selectedMenuIndex = 0;
+
+  // Define navigation items
+  final List<NavBarItem> _navItems = [
+    NavBarItem(icon: Icons.home, label: "Home"),
+    NavBarItem(icon: Icons.search, label: "Search"),
+    NavBarItem(icon: Icons.library_books_outlined, label: "My Courses"),
+    NavBarItem(icon: Icons.person_outline, label: "Profile"),
+  ];
 
   // User data - to be populated from auth provider
   String _userName = "Juan Dela Cruz";
@@ -122,6 +130,28 @@ class _StudentHomepageState extends State<StudentHomepage> {
     }
   }
 
+  // Add a method to handle navigation
+  void _handleNavigation(int index) {
+    // Update your state
+    setState(() {
+      _selectedMenuIndex = index;
+    });
+
+    // Add any navigation logic here
+    if (index == 1) {
+      // Navigate to search page
+      // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => SearchScreen()));
+    } else if (index == 2) {
+      // Navigate to my courses
+      // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => MyCoursesScreen()));
+    } else if (index == 3) {
+      // Navigate to profile
+      // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => ProfileScreen()));
+    }
+  }
+
+// Rest of your existing code...
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -159,7 +189,15 @@ class _StudentHomepageState extends State<StudentHomepage> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: _buildBottomNavigationBar(),
+            child: NavBar(
+              selectedIndex: _selectedMenuIndex,
+              onItemSelected: _handleNavigation,
+              items: _navItems,
+              // You can customize colors if needed:
+              // selectedColor: Colors.orange,
+              // unselectedColor: Colors.white60,
+              // backgroundColor: Colors.black,
+            ),
           ),
         ],
       ),
@@ -530,108 +568,5 @@ class _StudentHomepageState extends State<StudentHomepage> {
         ],
       ),
     );
-  }
-  
-  // Bottom navigation bar
-  Widget _buildBottomNavigationBar() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(40, 0, 40, 16),
-      height: 60,
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 10,
-            spreadRadius: 1
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildNavItem(0, Icons.home, "Home"),
-          _buildNavItem(1, Icons.search, "Search"),
-          _buildNavItem(2, Icons.library_books_outlined, "My Courses"),
-          _buildNavItem(3, Icons.person_outline, "Profile"),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem(int index, IconData icon, String label) {
-    bool isSelected = _selectedMenuIndex == index;
-
-    return InkWell(
-      onTap: () {
-        // Navigate based on the selected index
-        _navigateToSelectedPage(index);
-      },
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? Colors.orange : Colors.white60,
-            size: 24,
-          ),
-          SizedBox(height: 4),
-          if (isSelected) // Show the indicator for the selected item
-            Container(
-              width: 30,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.orange,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-// Add this new method to handle navigation
-  void _navigateToSelectedPage(int index) {
-    // Only navigate if we're not already on that page
-    if (_selectedMenuIndex == index) {
-      return;
-    }
-    if (index == 0) {
-      // Just update state for Home, no navigation needed
-      setState(() {
-        _selectedMenuIndex = 0;
-      });
-    } else if (index == 1) {
-      // Navigate to Search page
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (context) => Search()),
-      ).then((_) {
-        // When returning from Search page, reset to Home
-        setState(() {
-          _selectedMenuIndex = 0;
-        });
-      });
-    } else if (index == 2) {
-      // Navigate to My Courses page
-      // For now, just show a snackbar that this feature is coming soon
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('My Courses coming soon!')),
-      );
-      // Reset to home tab
-      setState(() {
-        _selectedMenuIndex = 0;
-      });
-    } else if (index == 3) {
-      // Navigate to Profile page
-      // For now, just show a snackbar that this feature is coming soon
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Profile coming soon!')),
-      );
-      // Reset to home tab
-      setState(() {
-        _selectedMenuIndex = 0;
-      });
-    }
   }
 }
