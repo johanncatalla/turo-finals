@@ -132,21 +132,28 @@ class _StudentHomepageState extends State<StudentHomepage> {
 
   // Add a method to handle navigation
   void _handleNavigation(int index) {
-    // Update your state
+    // Update the selected index state
     setState(() {
       _selectedMenuIndex = index;
     });
 
-    // Add any navigation logic here
-    if (index == 1) {
+    // Navigation logic using named routes
+    switch (index) {
+      case 0:
+      // Already on Home page, don't navigate
+        break;
+      case 1:
       // Navigate to search page
-      // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => SearchScreen()));
-    } else if (index == 2) {
-      // Navigate to my courses
-      // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => MyCoursesScreen()));
-    } else if (index == 3) {
-      // Navigate to profile
-      // For example: Navigator.push(context, MaterialPageRoute(builder: (context) => ProfileScreen()));
+        Navigator.pushReplacementNamed(context, '/search');
+        break;
+      case 2:
+      // Navigate to my courses (if route exists)
+        Navigator.pushReplacementNamed(context, '/courses');
+        break;
+      case 3:
+      // Navigate to profile (if route exists)
+        Navigator.pushReplacementNamed(context, '/profile');
+        break;
     }
   }
 

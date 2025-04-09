@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:turo/Screens/Students/search.dart';
 import 'package:turo/role_select.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
@@ -50,6 +51,11 @@ class MyApp extends StatelessWidget {
           return const RoleSelectionScreen();
         },
       ),
+      routes: {
+        '/studenthome': (context) => const StudentHomepage(),
+        '/search': (context) => const Search(),
+      },
     );
   }
+
 }
