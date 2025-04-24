@@ -664,8 +664,3 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
     );
   }
 }
-
-// will remove after merging to main
-void main() {
-  runApp(const MaterialApp(home: CreateCourseScreen()));
-}
