@@ -118,7 +118,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF4DB6AC) : Colors.grey[200],
+          color: isSelected ? const Color(0xFF53C6D9) : Colors.grey[200],
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
@@ -132,7 +132,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
     );
   }
 
-  // Class Schedule
+  // Class Schedule Time
   Widget _buildClassSchedule() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -390,8 +390,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   // appbar & order of widgets
   @override
   Widget build(BuildContext context) {
-    final Color primaryColor =
-        Theme.of(context).primaryColor ?? const Color(0xFF4DB6AC);
+    final Color primaryColor = Theme.of(context).primaryColor;
 
     return Scaffold(
       appBar: AppBar(
@@ -450,7 +449,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
               ),
             ),
 
-            // Course Title (TO CHANGE: TEXTFIELD -> DROPDOWN MENU)
+            //
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
@@ -640,7 +639,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
                   _tabController.index == 0
                       ? CourseTab.lecturer
                       : CourseTab.materials;
-              final DateTime? selectedCalendarDate = _calendarSelectedDay;
+              // final DateTime? selectedCalendarDate = _calendarSelectedDay;
 
               print('--- Saving Course ---');
               print('Title: $courseTitle');
@@ -648,7 +647,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
               print('Start Time: $startTimeStr ($_startTime)');
               print('End Time: $endTimeStr ($_endTime)');
               print('Selected Days: $scheduleDays');
-              print('Selected Calendar Date: $selectedCalendarDate');
+              // print('Selected Calendar Date: $selectedCalendarDate');
               print('Current Tab Index: ${_tabController.index} ($currentTab)');
             },
             child: const Text(
@@ -666,7 +665,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 }
 
-// will comment this after pull (pls)
+// will remove after merging to main
 void main() {
   runApp(const MaterialApp(home: CreateCourseScreen()));
 }

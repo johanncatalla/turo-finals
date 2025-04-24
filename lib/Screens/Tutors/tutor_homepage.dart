@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:turo/providers/auth_provider.dart';
 import 'package:turo/role_select.dart';
 import 'package:turo/Screens/Tutors/tutor_profileui_test.dart';
-//import 'package:turo/Screens/Tutors/tutor_createcourse.dart'; // Import Create Course screen
+import 'package:turo/Screens/Tutors/tutor_createcourse.dart'; // Import Create Course screen
 //import 'package:turo/Screens/Tutors/tutor_createmodule.dart'; (TODO: To add tutor_createmodule)
 // Import the TutokFeed screen when it exists
 // import 'package:turo/Screens/Tutors/tutokfeed.dart'; // Placeholder for future import
@@ -332,14 +332,12 @@ class _TutorHomepageState extends State<TutorHomepage>
 
           ElevatedButton(
             onPressed: () {
-              /*
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const CreateCourseScreen(),
                 ),
               );
-            */
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: _primaryColor.withOpacity(0.1),
@@ -946,7 +944,7 @@ class _TutorHomepageState extends State<TutorHomepage>
         } else if (index == 1) {
           print("Video/TutokFeed Nav Tapped - Navigation Commented Out");
           /*
-          // UNCOMMENT WHEN TutokFeed page is created: (or remove)
+          // UNCOMMENT WHEN TutokFeed page is created: (or remove if necessary)
           Navigator.push(
              context,
              MaterialPageRoute(builder: (context) => const TutokFeed()),
