@@ -51,6 +51,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  table_calendar: ^3.1.0
+  fl_chart: ^0.63.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -78,6 +80,19 @@ flutter:
     - assets/Journal.png
     - assets/image4.png
     - assets/image2.png
+    - assets/tutor2.png
+    - assets/homecard.png
+    - assets/b1.png
+    - assets/b2.png
+    - assets/b3.png
+    - assets/b4.png
+    - assets/b5.png
+    - assets/studentprof.png
+    - assets/image1.png
+    - assets/joshua.png
+    - assets/student1.png
+    - assets/student2.png
+    
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
