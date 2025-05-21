@@ -10,10 +10,12 @@ class AuthProvider extends ChangeNotifier {
   User? _user;
   final DirectusService _directusService = DirectusService();
   String? _errorMessage;
+  Map<String, dynamic>? _fullUserProfile;
 
   AuthStatus get status => _status;
   User? get user => _user;
   String? get errorMessage => _errorMessage;
+  Map<String, dynamic>? get fullUserProfile => _fullUserProfile;
 
   AuthProvider() {
     // Check authentication status when app starts
@@ -111,11 +113,94 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Get full user profile with all details
+  Future<Map<String, dynamic>> getFullUserProfile() async {
+    if (_user == null) {
+      _errorMessage = 'User not authenticated';
+      return {'success': false, 'message': 'User not authenticated'};
+    }
+
+    final response = await _directusService.getFullUserProfile(_user!.id);
+    
+    if (response['success']) {
+      _fullUserProfile = response['data'];
+      notifyListeners();
+    } else {
+      _errorMessage = response['message'];
+    }
+    
+    return response;
+  }
+
+  // Update user profile
+  Future<Map<String, dynamic>> updateUserProfile(Map<String, dynamic> userData) async {
+    if (_user == null) {
+      _errorMessage = 'User not authenticated';
+      return {'success': false, 'message': 'User not authenticated'};
+    }
+
+    final response = await _directusService.updateUserProfile(_user!.id, userData);
+    
+    if (response['success']) {
+      // Update the local user data
+      _user = User.fromJson(response['data']);
+      
+      // If we have the full profile, update that too
+      if (_fullUserProfile != null) {
+        _fullUserProfile = {
+          ..._fullUserProfile!,
+          ...response['data'],
+        };
+      }
+      
+      notifyListeners();
+    } else {
+      _errorMessage = response['message'];
+    }
+    
+    return response;
+  }
+
+  // Update student profile
+  Future<Map<String, dynamic>> updateStudentProfile(String studentId, Map<String, dynamic> profileData) async {
+    if (_user == null || !_user!.isStudent) {
+      _errorMessage = 'Not authorized to update student profile';
+      return {'success': false, 'message': 'Not authorized to update student profile'};
+    }
+
+    final response = await _directusService.updateStudentProfile(studentId, profileData);
+    
+    if (response['success'] && _fullUserProfile != null) {
+      // Check the types before updating the student profile
+      final studentProfile = _fullUserProfile!['student_profile'];
+      final responseData = response['data'];
+      
+      // Only update if both are maps
+      if (studentProfile is Map && responseData is Map) {
+        // Update the student profile in the full user profile with explicit typing
+        _fullUserProfile!['student_profile'] = <String, dynamic>{
+          ...(studentProfile as Map<String, dynamic>),
+          ...(responseData as Map<String, dynamic>),
+        };
+      } else {
+        // If not a map, just replace the whole thing
+        _fullUserProfile!['student_profile'] = responseData;
+      }
+      
+      notifyListeners();
+    } else {
+      _errorMessage = response['message'];
+    }
+    
+    return response;
+  }
+
   // Logout
   Future<void> logout() async {
     await _directusService.logout();
     _status = AuthStatus.unauthenticated;
     _user = null;
+    _fullUserProfile = null;
     notifyListeners();
   }
 }

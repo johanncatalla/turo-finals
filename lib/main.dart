@@ -5,6 +5,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:turo/providers/auth_provider.dart';
 import 'package:turo/Screens/Students/student_homepage.dart';
+import 'package:turo/Screens/Students/my_courses_screen.dart';
+import 'package:turo/Screens/Students/student_profile_screen.dart';
 import 'package:turo/Screens/Tutors/tutor_homepage.dart';
 
 void main() async {
@@ -54,6 +56,8 @@ class MyApp extends StatelessWidget {
       routes: {
         '/studenthome': (context) => const StudentHomepage(),
         '/search': (context) => const Search(),
+        '/courses': (context) => const MyCoursesScreen(),
+        '/profile': (context) => const StudentProfileScreen(),
       },
     );
   }

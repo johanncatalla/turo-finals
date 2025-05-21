@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:turo/providers/auth_provider.dart';
 import 'package:turo/role_select.dart';
 import 'package:turo/Widgets/navbar.dart';
+import 'package:turo/Screens/Students/all_instructors_screen.dart';
+import 'package:turo/Screens/Students/all_courses_screen.dart';
 
 class StudentHomepage extends StatefulWidget {
   const StudentHomepage({super.key});
@@ -157,8 +159,6 @@ class _StudentHomepageState extends State<StudentHomepage> {
     }
   }
 
-// Rest of your existing code...
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -177,11 +177,20 @@ class _StudentHomepageState extends State<StudentHomepage> {
                 _buildHeroBanner(),
           
                 // Instructors Section
-                _buildSectionHeader('Instructors', () {}),
+                _buildSectionHeader('Instructors', () {
+                  Navigator.pushReplacementNamed(context, '/search');
+                }),
                 _buildInstructorsRow(),
           
                 // Courses Section
-                _buildSectionHeader('Courses', () {}),
+                _buildSectionHeader('Courses', () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AllCoursesScreen(courses: _courses),
+                    ),
+                  );
+                }),
                 _buildCoursesTabs(),
                 _buildCoursesListing(),
                 
