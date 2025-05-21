@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -281,7 +280,6 @@ class DirectusService {
     }
   }
 
-// Fetch a tutor profile with related data by user ID
   // Fetch a tutor profile with related data by user ID using the user's token
   Future<Map<String, dynamic>> fetchTutorProfileByUserId(String userId) async {
     try {
@@ -324,6 +322,177 @@ class DirectusService {
         'success': false,
         'message': 'Network error: ${e.toString()}'
       };
+    }
+  }
+  // Create a new course
+  Future<Map<String, dynamic>> createCourse({
+    required String title,
+    required String description,
+    required String subjectId, // ID of the related subject item
+    required String tutorId,   // ID of the user (e.g., from directus_users) who is the tutor
+  }) async {
+    if (baseUrl == null) {
+      return {'success': false, 'message': 'API base URL is not configured.'};
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? accessToken = prefs.getString('accessToken');
+
+      if (accessToken == null) {
+        // This case should ideally be caught by refreshTokenIfNeeded if it performs logout on no token
+        return {'success': false, 'message': 'Not authenticated. No access token found.'};
+      }
+
+      // Ensure token is fresh before making the call
+      if (!await refreshTokenIfNeeded()) {
+        // refreshTokenIfNeeded returned false, implying session is problematic.
+        // It attempts logout if refresh fails or no refresh token exists.
+        return {'success': false, 'message': 'Session expired or invalid. Please log in again.'};
+      }
+
+      // Re-fetch the access token as it might have been refreshed
+      accessToken = prefs.getString('accessToken');
+      if (accessToken == null) {
+        // This implies tokens were cleared during the refresh process (e.g., by logout() call within refreshTokenIfNeeded)
+        return {'success': false, 'message': 'Authentication token unavailable after refresh attempt. Please log in again.'};
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/items/Courses'), // Assuming 'courses' is the collection key
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode({
+          'title': title,
+          'description': description,
+          'subject_id': subjectId, // This should be the ID (PK) of an item in the "subjects" collection
+          'tutor_id': tutorId,     // This should be the ID (PK) of an item in the "users" or "tutors" collection
+        }),
+      );
+
+      // Handle cases where response body might be empty
+      if (response.body.isEmpty) {
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          return {'success': true, 'data': null, 'message': 'Course created successfully (server returned no content). Status: ${response.statusCode}'};
+        } else {
+          return {'success': false, 'message': 'Failed to create course. Server returned status ${response.statusCode} with an empty response.'};
+        }
+      }
+
+      final data = jsonDecode(response.body);
+
+      // Directus typically returns 200 OK on successful item creation.
+      // 201 Created is also a standard RESTful response for successful creation.
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true, 'data': data['data']};
+      } else {
+        String errorMessage = 'Failed to create course.';
+        if (data['errors'] != null && data['errors'] is List && data['errors'].isNotEmpty) {
+          if (data['errors'][0]['message'] != null) {
+            errorMessage = data['errors'][0]['message'];
+          }
+        } else if (data['message'] != null) {
+          errorMessage = data['message'];
+        }
+        return {
+          'success': false,
+          'message': errorMessage,
+          'statusCode': response.statusCode
+        };
+      }
+    } catch (e) {
+      print('Error in createCourse: $e');
+      if (e is http.ClientException || e.toString().toLowerCase().contains('socketexception')) {
+        return {'success': false, 'message': 'Network error: Could not connect to the server.'};
+      } else if (e is FormatException) {
+        return {'success': false, 'message': 'Error parsing server response.'};
+      }
+      return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
+    }
+  }
+  // Create a new Tutor Availability slot
+  Future<Map<String, dynamic>> createTutorAvailability({
+    required String tutorId,       // Relation to the tutor (user ID)
+    required String dayOfWeek,     // e.g., "Monday", "Tuesday", or "1", "2" if using numeric representation
+    required String startTime,     // Format: "HH:MM" or "HH:MM:SS", e.g., "09:00" or "09:00:00"
+    required String endTime,       // Format: "HH:MM" or "HH:MM:SS", e.g., "17:00" or "17:00:00"
+    required bool recurring,
+    String? specificDate,         // Format: "YYYY-MM-DD", e.g., "2023-12-25". Nullable.
+  }) async {
+    if (baseUrl == null) {
+      return {'success': false, 'message': 'API base URL is not configured.'};
+    }
+
+    try {
+      // Ensure token is fresh before making the call
+      if (!await refreshTokenIfNeeded()) {
+        return {'success': false, 'message': 'Session expired or invalid. Please log in again.'};
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      String? accessToken = prefs.getString('accessToken');
+      if (accessToken == null) {
+        // This should ideally be caught by refreshTokenIfNeeded if it performs logout on no token
+        return {'success': false, 'message': 'Authentication token unavailable after refresh attempt. Please log in again.'};
+      }
+
+      // Prepare the payload
+      Map<String, dynamic> payload = {
+        'tutor_id': tutorId,
+        'day_of_week': dayOfWeek,
+        'start_time': startTime,
+        'end_time': endTime,
+        'recurring': recurring,
+      };
+
+      // Add specific_date only if it's provided
+      // Directus handles null for optional fields, so sending it explicitly if null or omitting is fine.
+      // For clarity, we only add it if it has a value.
+      if (specificDate != null && specificDate.isNotEmpty) {
+        payload['specific_date'] = specificDate;
+      }
+      // If 'recurring' is true, 'specific_date' might logically be null or ignored by backend.
+      // If 'recurring' is false, 'specific_date' is important. The API design handles this.
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/items/TutorAvailability'), // **ASSUMPTION**: Collection name is 'tutor_availability'
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.body.isEmpty) {
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          return {'success': true, 'data': null, 'message': 'Tutor availability created (no content). Status: ${response.statusCode}'};
+        } else {
+          return {'success': false, 'message': 'Failed to create tutor availability. Status ${response.statusCode} (empty response).'};
+        }
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true, 'data': data['data']};
+      } else {
+        String errorMessage = data['errors']?[0]?['message'] ?? data['message'] ?? 'Failed to create tutor availability.';
+        return {
+          'success': false,
+          'message': errorMessage,
+          'statusCode': response.statusCode
+        };
+      }
+    } catch (e) {
+      print('Error in createTutorAvailability: $e');
+      if (e is http.ClientException || e.toString().toLowerCase().contains('socketexception')) {
+        return {'success': false, 'message': 'Network error: Could not connect.'};
+      } else if (e is FormatException) {
+        return {'success': false, 'message': 'Error parsing server response.'};
+      }
+      return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
     }
   }
 }
