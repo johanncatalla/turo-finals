@@ -57,7 +57,8 @@ class DirectusService {
   }) async {
     try {
       // Normalize accountType to handle both lowercase and uppercase
-      final normalizedAccountType = accountType.toLowerCase() == 'student' ? 'Student' : accountType;
+      final normalizedAccountType = accountType.toLowerCase() == 'student' ? 'Student' : 
+                                   accountType.toLowerCase() == 'tutor' ? 'Tutor' : accountType;
       
       // Use admin token to create user (this should be configured in your .env file)
       final adminToken = dotenv.env['ADMIN_TOKEN'];
@@ -74,7 +75,8 @@ class DirectusService {
           'email': email,
           'password': password,
           'user_type': normalizedAccountType,
-          'role': normalizedAccountType == 'Student' ? 'e492a4a1-4f3f-42f2-a63e-5fa988dacb33' : null,
+          'role': normalizedAccountType == 'Student' ? 'e492a4a1-4f3f-42f2-a63e-5fa988dacb33' : 
+                 normalizedAccountType == 'Tutor' ? 'f3742571-de1f-4a19-a249-743834adb070' : null,
           'status': 'active', // Set status to active for immediate access
         }),
       );

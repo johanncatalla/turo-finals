@@ -270,7 +270,7 @@ class _TutorSignUpScreenState extends State<TutorSignUpScreen> {
         lastName: _lastNameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
-        accountType: 'tutor',
+        accountType: 'Tutor',
       );
 
       if (success) {
