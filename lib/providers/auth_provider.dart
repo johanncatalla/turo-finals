@@ -60,7 +60,7 @@ class AuthProvider extends ChangeNotifier {
       final userData = response['data']['data'];
       _user = User.fromJson(userData);
       
-      // Check if account type matches expected type
+      // Check if account type matches expected type (case-insensitive)
       if (_user!.accountType.toLowerCase() != expectedAccountType.toLowerCase()) {
         _errorMessage = 'This account is not registered as a $expectedAccountType';
         _status = AuthStatus.unauthenticated;

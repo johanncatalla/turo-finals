@@ -56,15 +56,25 @@ class DirectusService {
     required String accountType,
   }) async {
     try {
+      // Normalize accountType to handle both lowercase and uppercase
+      final normalizedAccountType = accountType.toLowerCase() == 'student' ? 'Student' : accountType;
+      
+      // Use admin token to create user (this should be configured in your .env file)
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      
       final response = await http.post(
         Uri.parse('$baseUrl/users'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
         body: jsonEncode({
           'first_name': firstName,
           'last_name': lastName,
           'email': email,
           'password': password,
-          'user_type': accountType,
+          'user_type': normalizedAccountType,
+          'role': normalizedAccountType == 'Student' ? 'e492a4a1-4f3f-42f2-a63e-5fa988dacb33' : null,
           'status': 'active', // Set status to active for immediate access
         }),
       );
