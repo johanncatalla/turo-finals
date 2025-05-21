@@ -346,8 +346,6 @@ class DirectusService {
 
       // Ensure token is fresh before making the call
       if (!await refreshTokenIfNeeded()) {
-        // refreshTokenIfNeeded returned false, implying session is problematic.
-        // It attempts logout if refresh fails or no refresh token exists.
         return {'success': false, 'message': 'Session expired or invalid. Please log in again.'};
       }
 
@@ -383,8 +381,6 @@ class DirectusService {
 
       final data = jsonDecode(response.body);
 
-      // Directus typically returns 200 OK on successful item creation.
-      // 201 Created is also a standard RESTful response for successful creation.
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {'success': true, 'data': data['data']};
       } else {
@@ -414,19 +410,18 @@ class DirectusService {
   }
   // Create a new Tutor Availability slot
   Future<Map<String, dynamic>> createTutorAvailability({
-    required String tutorId,       // Relation to the tutor (user ID)
-    required String dayOfWeek,     // e.g., "Monday", "Tuesday", or "1", "2" if using numeric representation
-    required String startTime,     // Format: "HH:MM" or "HH:MM:SS", e.g., "09:00" or "09:00:00"
-    required String endTime,       // Format: "HH:MM" or "HH:MM:SS", e.g., "17:00" or "17:00:00"
+    required String tutorId,
+    required List<String> daysOfWeek, // MODIFIED: Now accepts a List of day names
+    required String startTime,
+    required String endTime,
     required bool recurring,
-    String? specificDate,         // Format: "YYYY-MM-DD", e.g., "2023-12-25". Nullable.
+    String? specificDate,
   }) async {
     if (baseUrl == null) {
       return {'success': false, 'message': 'API base URL is not configured.'};
     }
 
     try {
-      // Ensure token is fresh before making the call
       if (!await refreshTokenIfNeeded()) {
         return {'success': false, 'message': 'Session expired or invalid. Please log in again.'};
       }
@@ -434,30 +429,23 @@ class DirectusService {
       final prefs = await SharedPreferences.getInstance();
       String? accessToken = prefs.getString('accessToken');
       if (accessToken == null) {
-        // This should ideally be caught by refreshTokenIfNeeded if it performs logout on no token
         return {'success': false, 'message': 'Authentication token unavailable after refresh attempt. Please log in again.'};
       }
 
-      // Prepare the payload
       Map<String, dynamic> payload = {
         'tutor_id': tutorId,
-        'day_of_week': dayOfWeek,
+        'day_of_week': daysOfWeek,
         'start_time': startTime,
         'end_time': endTime,
         'recurring': recurring,
       };
 
-      // Add specific_date only if it's provided
-      // Directus handles null for optional fields, so sending it explicitly if null or omitting is fine.
-      // For clarity, we only add it if it has a value.
-      if (specificDate != null && specificDate.isNotEmpty) {
+      if (!recurring && specificDate != null && specificDate.isNotEmpty) {
         payload['specific_date'] = specificDate;
       }
-      // If 'recurring' is true, 'specific_date' might logically be null or ignored by backend.
-      // If 'recurring' is false, 'specific_date' is important. The API design handles this.
 
       final response = await http.post(
-        Uri.parse('$baseUrl/items/TutorAvailability'), // **ASSUMPTION**: Collection name is 'tutor_availability'
+        Uri.parse('$baseUrl/items/TutorAvailability'), // Ensure 'TutorAvailability' is your collection key
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $accessToken',
