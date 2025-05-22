@@ -87,14 +87,14 @@ class _TutorHomepageState extends State<TutorHomepage>
           context: context,
           builder: (context) => AlertDialog(/* ... dialog content ... */),
         ) ??
-        false;
+            false;
 
     if (shouldLogout && mounted) {
       await authProvider.logout();
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
-        (route) => false,
+            (route) => false,
       );
     }
   }
@@ -316,7 +316,7 @@ class _TutorHomepageState extends State<TutorHomepage>
             time: "1hr/day",
             instructor: "Mr. J Perez",
             description:
-                "A practical course designed to build confidence and fluency in conversational...",
+            "A practical course designed to build confidence and fluency in conversational...",
           ),
           const SizedBox(height: 16),
 
@@ -326,7 +326,7 @@ class _TutorHomepageState extends State<TutorHomepage>
             time: "1hr/day",
             instructor: "Mr. J Perez",
             description:
-                "A practical course designed to build confidence and fluency in journalistic storytelling. This course goes beyond j...",
+            "A practical course designed to build confidence and fluency in journalistic storytelling. This course goes beyond j...",
           ),
           const SizedBox(height: 24),
 
@@ -392,15 +392,15 @@ class _TutorHomepageState extends State<TutorHomepage>
               fit: BoxFit.cover,
               errorBuilder:
                   (context, error, stackTrace) => Container(
-                    width: 90,
-                    height: 90,
-                    color: Colors.grey.shade200,
-                    child: Icon(
-                      Icons.school_outlined,
-                      color: Colors.grey.shade400,
-                      size: 40,
-                    ),
-                  ),
+                width: 90,
+                height: 90,
+                color: Colors.grey.shade200,
+                child: Icon(
+                  Icons.school_outlined,
+                  color: Colors.grey.shade400,
+                  size: 40,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 12), // Space between image and text
@@ -547,9 +547,9 @@ class _TutorHomepageState extends State<TutorHomepage>
       ),
       child: Row(
         mainAxisAlignment:
-            MainAxisAlignment.spaceBetween, // Push content and icon apart
+        MainAxisAlignment.spaceBetween, // Push content and icon apart
         crossAxisAlignment:
-            CrossAxisAlignment.center, // Center items vertically
+        CrossAxisAlignment.center, // Center items vertically
         children: [
           // Left Side: Text Content
           Expanded(
@@ -563,8 +563,8 @@ class _TutorHomepageState extends State<TutorHomepage>
                   style: const TextStyle(
                     fontSize: 16, // Match title size from image
                     fontWeight:
-                        FontWeight
-                            .w600, // Slightly less bold than course title? Check image
+                    FontWeight
+                        .w600, // Slightly less bold than course title? Check image
                     color: Colors.black87,
                   ),
                   maxLines: 2, // Allow wrapping if title is long
@@ -704,7 +704,7 @@ class _TutorHomepageState extends State<TutorHomepage>
           padding: const EdgeInsets.symmetric(horizontal: 12),
           // Use updated primary color
           backgroundColor:
-              isPrimary ? _primaryColor.withOpacity(0.1) : Colors.grey.shade200,
+          isPrimary ? _primaryColor.withOpacity(0.1) : Colors.grey.shade200,
           foregroundColor: isPrimary ? _primaryColor : Colors.grey.shade700,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
@@ -726,7 +726,7 @@ class _TutorHomepageState extends State<TutorHomepage>
             reviewerName: "John Leo Echevarria",
             date: "September 10, 2023",
             reviewText:
-                "Excellent tutor! Adjusts his lesson to my level of understanding and provides a comfortable learning atmosphere in his class. 10/10 would recommend!",
+            "Excellent tutor! Adjusts his lesson to my level of understanding and provides a comfortable learning atmosphere in his class. 10/10 would recommend!",
             rating: 5,
           ),
           const SizedBox(height: 16),
@@ -735,7 +735,7 @@ class _TutorHomepageState extends State<TutorHomepage>
             reviewerName: "John Leo Echevarria",
             date: "September 10, 2023",
             reviewText:
-                "Excellent tutor! Adjusts his lesson to my level of understanding and provides a comfortable learning atmosphere in his class. 10/10 would recommend!",
+            "Excellent tutor! Adjusts his lesson to my level of understanding and provides a comfortable learning atmosphere in his class. 10/10 would recommend!",
             rating: 5,
           ),
         ],
@@ -780,16 +780,16 @@ class _TutorHomepageState extends State<TutorHomepage>
               fit: BoxFit.cover,
               errorBuilder:
                   (context, error, stackTrace) => Container(
-                    // Fallback
-                    width: 80,
-                    height: 80,
-                    color: Colors.grey.shade200,
-                    child: Icon(
-                      Icons.person_pin_circle_outlined,
-                      color: Colors.grey.shade400,
-                      size: 40,
-                    ),
-                  ),
+                // Fallback
+                width: 80,
+                height: 80,
+                color: Colors.grey.shade200,
+                child: Icon(
+                  Icons.person_pin_circle_outlined,
+                  color: Colors.grey.shade400,
+                  size: 40,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 12), // Space between image and text
@@ -834,7 +834,7 @@ class _TutorHomepageState extends State<TutorHomepage>
                 Row(
                   children: List.generate(
                     5,
-                    (index) => Icon(
+                        (index) => Icon(
                       index < rating
                           ? Icons.star_rounded
                           : Icons.star_border_rounded, // Use rounded stars
@@ -988,3 +988,4 @@ class _TutorHomepageState extends State<TutorHomepage>
     );
   }
 }
+

@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
@@ -502,23 +501,18 @@ class DirectusService {
   // Fetch a tutor profile with related data by user ID using the user's token
   Future<Map<String, dynamic>> fetchTutorProfileByUserId(String userId) async {
     try {
-      // Get current user's access token
-      final prefs = await SharedPreferences.getInstance();
-      final accessToken = prefs.getString('accessToken');
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
 
-      if (accessToken == null) {
-        return {
-          'success': false,
-          'message': 'Not authenticated'
-        };
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
       }
 
       // First, get the tutor_profile relation for this user
       final userResponse = await http.get(
-        Uri.parse('$baseUrl/users/me?fields=id,first_name,last_name,email,user_type,tutor_profile.*,tutor_profile.subjects.*'),
+        Uri.parse('$baseUrl/users/$userId?fields=id,first_name,last_name,email,user_type,tutor_profile.*,tutor_profile.subjects.*'),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $accessToken',
+          'Authorization': 'Bearer $adminToken',
         },
       );
 
@@ -555,31 +549,17 @@ class DirectusService {
     }
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      String? accessToken = prefs.getString('accessToken');
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
 
-      if (accessToken == null) {
-        // This case should ideally be caught by refreshTokenIfNeeded if it performs logout on no token
-        return {'success': false, 'message': 'Not authenticated. No access token found.'};
-      }
-
-      // Ensure token is fresh before making the call
-      if (!await refreshTokenIfNeeded()) {
-        return {'success': false, 'message': 'Session expired or invalid. Please log in again.'};
-      }
-
-      // Re-fetch the access token as it might have been refreshed
-      accessToken = prefs.getString('accessToken');
-      if (accessToken == null) {
-        // This implies tokens were cleared during the refresh process (e.g., by logout() call within refreshTokenIfNeeded)
-        return {'success': false, 'message': 'Authentication token unavailable after refresh attempt. Please log in again.'};
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
       }
 
       final response = await http.post(
         Uri.parse('$baseUrl/items/Courses'), // Assuming 'courses' is the collection key
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $accessToken',
+          'Authorization': 'Bearer $adminToken',
         },
         body: jsonEncode({
           'title': title,
@@ -641,14 +621,10 @@ class DirectusService {
     }
 
     try {
-      if (!await refreshTokenIfNeeded()) {
-        return {'success': false, 'message': 'Session expired or invalid. Please log in again.'};
-      }
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
 
-      final prefs = await SharedPreferences.getInstance();
-      String? accessToken = prefs.getString('accessToken');
-      if (accessToken == null) {
-        return {'success': false, 'message': 'Authentication token unavailable after refresh attempt. Please log in again.'};
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
       }
 
       Map<String, dynamic> payload = {
@@ -667,7 +643,7 @@ class DirectusService {
         Uri.parse('$baseUrl/items/TutorAvailability'), // Ensure 'TutorAvailability' is your collection key
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $accessToken',
+          'Authorization': 'Bearer $adminToken',
         },
         body: jsonEncode(payload),
       );
@@ -700,6 +676,40 @@ class DirectusService {
         return {'success': false, 'message': 'Error parsing server response.'};
       }
       return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchCoursesByTutorId(String tutorId) async {
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      final url = Uri.parse(
+        '$baseUrl/items/courses?filter[tutor_id][_eq]=$tutorId&fields=id,title,description,subject_id,tutor_id,course_image,bookings',
+      );
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {'success': true, 'data': data['data']};
+      } else {
+        return {
+          'success': false,
+          'message': 'Failed to fetch courses: ${response.body}'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Error: $e'};
     }
   }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'dart:ui' show PointerDeviceKind;
+import '../../providers/auth_provider.dart';
 import '../../services/directus_service.dart';
 
 // Reuse your existing class definitions
@@ -126,25 +128,18 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
   // Method to load user data from DirectusService
   Future<void> _loadUserData() async {
     try {
-      // First check if token needs refreshing
-      bool isValid = await _directusService.refreshTokenIfNeeded();
-      if (!isValid) {
-        setState(() {
-          isLoading = false;
-          errorMessage = 'Session expired. Please login again.';
-        });
-        return;
-      }
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userID = await authProvider.user!.id;
+      // final result = await authProvider.getFullUserProfile();
 
       // Get user data with all related fields
-      final result = await _directusService.fetchTutorProfile();
+      final result = await _directusService.fetchTutorProfileByUserId(userID);
 
       setState(() {
         isLoading = false;
         if (result['success']) {
           // Store the user data
           userData = result['data'];
-
           // Handle tutor_profile field based on the returned structure
           if (userData != null) {
             var tutorProfileField = userData!['tutor_profile'];
