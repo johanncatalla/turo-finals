@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:turo/providers/auth_provider.dart';
+import 'package:turo/providers/course_provider.dart';
 import 'package:turo/role_select.dart';
 import 'package:turo/Widgets/navbar.dart';
 import 'package:turo/Screens/Students/all_instructors_screen.dart';
 import 'package:turo/Screens/Students/all_courses_screen.dart';
+import 'package:turo/Screens/Students/course_detail_screen.dart';
+import 'package:turo/Screens/Students/instructor_detail_screen.dart';
 
 class StudentHomepage extends StatefulWidget {
   const StudentHomepage({super.key});
@@ -32,58 +35,11 @@ class _StudentHomepageState extends State<StudentHomepage> {
   // User data - to be populated from auth provider
   String _userName = "Juan Dela Cruz";
 
-  // Dummy data for instructors
-  final List<Map<String, dynamic>> _instructors = [
-    {
-      'name': 'Johann',
-      'image': 'assets/joshua.png',
-    },
-    {
-      'name': 'Leo',
-      'image': 'assets/joshua.png',
-    },
-    {
-      'name': 'Nicole',
-      'image': 'assets/joshua.png',
-    },
-    {
-      'name': 'Joshua',
-      'image': 'assets/joshua.png',
-    },
-  ];
-
-  // Dummy data for courses
-  final List<Map<String, dynamic>> _courses = [
-    {
-      'title': 'Introduction to Python',
-      'description': 'An engaging beginner-friendly course that introduces the fundamentals of Python...',
-      'instructor': 'Mr. J. Seb Catalla',
-      'duration': '1hr/day',
-      'image': 'assets/courses/python.png',
-      'categories': ['Hot', 'Programming'],
-    },
-    {
-      'title': 'Conversational English',
-      'description': 'A practical course designed to build confidence and fluency in conversational...',
-      'instructor': 'Mr. J.L Echevaria',
-      'duration': '1hr/day',
-      'image': 'assets/courses/python.png',
-      'categories': ['Hot', 'Language'],
-    },
-    {
-      'title': 'Foundational Algebra',
-      'description': 'A foundational course that explores the core principles of algebra, including solving...',
-      'instructor': 'Ms. PNC. Oriola',
-      'duration': '1hr/day',
-      'image': 'assets/courses/python.png',
-      'categories': ['Hot', 'Math'],
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _initializeData();
   }
 
   // Load user data from auth provider
@@ -95,6 +51,14 @@ class _StudentHomepageState extends State<StudentHomepage> {
           _userName = authProvider.user!.fullName;
         });
       }
+    });
+  }
+  
+  // Initialize course and instructor data
+  void _initializeData() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final courseProvider = Provider.of<CourseProvider>(context, listen: false);
+      courseProvider.initialize();
     });
   }
 
@@ -161,44 +125,93 @@ class _StudentHomepageState extends State<StudentHomepage> {
 
   @override
   Widget build(BuildContext context) {
+    // Access the course provider
+    final courseProvider = Provider.of<CourseProvider>(context);
+    final bool isLoading = courseProvider.isLoading;
+    final String? error = courseProvider.error;
+    
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: null, // Remove the app bar completely
       body: Stack(
         children: [
-          SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Welcome message and notification button
-                _buildWelcomeHeader(),
-                
-                // Hero Banner with search bar overlay
-                _buildHeroBanner(),
-          
-                // Instructors Section
-                _buildSectionHeader('Instructors', () {
-                  Navigator.pushReplacementNamed(context, '/search');
-                }),
-                _buildInstructorsRow(),
-          
-                // Courses Section
-                _buildSectionHeader('Courses', () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AllCoursesScreen(courses: _courses),
+          if (isLoading) 
+            // Show loading indicator
+            Center(
+              child: CircularProgressIndicator(
+                color: Colors.orange,
+              ),
+            )
+          else if (error != null) 
+            // Show error message
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red, size: 64),
+                    SizedBox(height: 16),
+                    Text(
+                      'Error loading data',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  );
-                }),
-                _buildCoursesTabs(),
-                _buildCoursesListing(),
-                
-                // Add bottom padding to avoid content being hidden by the bottom navigation bar
-                SizedBox(height: 100),
-              ],
+                    SizedBox(height: 8),
+                    Text(
+                      error,
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => courseProvider.initialize(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            // Show content
+            SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Welcome message and notification button
+                  _buildWelcomeHeader(),
+                  
+                  // Hero Banner with search bar overlay
+                  _buildHeroBanner(),
+              
+                  // Instructors Section
+                  _buildSectionHeader('Instructors', () {
+                    Navigator.pushReplacementNamed(context, '/search');
+                  }),
+                  _buildInstructorsRow(courseProvider),
+              
+                  // Courses Section
+                  _buildSectionHeader('Courses', () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AllCoursesScreen(courses: courseProvider.courses),
+                      ),
+                    );
+                  }),
+                  _buildCoursesTabs(),
+                  _buildCoursesListing(courseProvider),
+                  
+                  // Add bottom padding to avoid content being hidden by the bottom navigation bar
+                  SizedBox(height: 100),
+                ],
+              ),
             ),
-          ),
           
           // Bottom navigation bar
           Positioned(
@@ -375,48 +388,81 @@ class _StudentHomepageState extends State<StudentHomepage> {
   }
 
   // Instructors row with rounded rectangular avatars
-  Widget _buildInstructorsRow() {
+  Widget _buildInstructorsRow(CourseProvider courseProvider) {
+    final instructors = courseProvider.instructors;
+    
+    print('Building instructors row with ${instructors.length} instructors');
+    
+    if (instructors.isEmpty) {
+      return Container(
+        height: 120,
+        padding: const EdgeInsets.only(left: 16, right: 16),
+        child: Center(
+          child: Text(
+            'No instructors available',
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 16,
+            ),
+          ),
+        ),
+      );
+    }
+    
     return Container(
       height: 120,
       padding: const EdgeInsets.only(left: 6, right: 6),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: _instructors.length,
+        itemCount: instructors.length,
         itemBuilder: (context, index) {
-          return _buildInstructorItem(_instructors[index]);
+          print('Building instructor item ${index}: ${instructors[index]['name']}');
+          return _buildInstructorItem(instructors[index], courseProvider);
         },
       ),
     );
   }
 
-  Widget _buildInstructorItem(Map<String, dynamic> instructor) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10.0),
-      child: Column(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(15),
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage(instructor['image']),
-                  fit: BoxFit.cover,
+  Widget _buildInstructorItem(Map<String, dynamic> instructor, CourseProvider courseProvider) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => InstructorDetailScreen(instructor: instructor),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10.0),
+        child: Column(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: instructor['image'] != null && instructor['image'].toString().isNotEmpty
+                        ? NetworkImage(courseProvider.getAssetUrl(instructor['image']))
+                        : const AssetImage('assets/joshua.png') as ImageProvider,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            instructor['name'],
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-              fontWeight: FontWeight.w500,
+            const SizedBox(height: 8),
+            Text(
+              instructor['first_name'] ?? 'Instructor',
+              style: const TextStyle(
+                fontSize: 16,
+                color: Colors.grey,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -483,10 +529,11 @@ class _StudentHomepageState extends State<StudentHomepage> {
   }
 
   // Course listing
-  Widget _buildCoursesListing() {
+  Widget _buildCoursesListing(CourseProvider courseProvider) {
     // Filter courses based on selected tab
     final String selectedCategory = _courseTabs[_selectedCourseTab];
-    final filteredCourses = _courses.where((course) {
+    final courses = courseProvider.courses;
+    final filteredCourses = courses.where((course) {
       return course['categories'].contains(selectedCategory);
     }).toList();
 
@@ -498,90 +545,164 @@ class _StudentHomepageState extends State<StudentHomepage> {
       constraints: BoxConstraints(
         minHeight: minHeight,
       ),
-      child: ListView.builder(
-        shrinkWrap: true, // Make list take only the space it needs
-        physics: const NeverScrollableScrollPhysics(), // Disable scrolling
-        itemCount: filteredCourses.length,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemBuilder: (context, index) {
-          return _buildCourseItem(filteredCourses[index]);
-        },
-      ),
+      child: filteredCourses.isEmpty
+        ? Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Text(
+                'No courses available in this category',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+          )
+        : ListView.builder(
+            shrinkWrap: true, // Make list take only the space it needs
+            physics: const NeverScrollableScrollPhysics(), // Disable scrolling
+            itemCount: filteredCourses.length,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemBuilder: (context, index) {
+              return _buildCourseItem(filteredCourses[index], courseProvider);
+            },
+          ),
     );
   }
 
   // Individual course item
-  Widget _buildCourseItem(Map<String, dynamic> course) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Course image
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Image.asset(
-              course['image'],
-              width: 120,
-              height: 120,
-              fit: BoxFit.cover,
+  Widget _buildCourseItem(Map<String, dynamic> course, CourseProvider courseProvider) {
+    // Get instructor data from the ID
+    final int instructorId = course['instructorId'] is int ? course['instructorId'] : 0;
+    final instructors = courseProvider.instructors;
+    final Map<String, dynamic> instructor = instructorId >= 0 && instructorId < instructors.length
+        ? instructors[instructorId]
+        : {'name': course['instructorName'] ?? 'Unknown Instructor'};
+    
+    return GestureDetector(
+      onTap: () {
+        // Pass both course and instructor data to the detail screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CourseDetailScreen(
+              course: course,
+              instructor: instructor,
             ),
           ),
-          const SizedBox(width: 16),
-          // Course details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  course['title'],
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 10),
+        height: 150, // Increased height to prevent overflow
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade200),
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Course image with Hero animation
+            Hero(
+              tag: 'course-${course['title']}',
+              child: Container(
+                width: 120,
+                height: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(10),
+                    bottomLeft: Radius.circular(10),
+                  ),
+                  image: DecorationImage(
+                    image: course['image'] != null && !course['image'].toString().startsWith('assets/')
+                        ? NetworkImage(courseProvider.getAssetUrl(course['image']))
+                        : const AssetImage('assets/courses/python.png') as ImageProvider,
+                    fit: BoxFit.cover,
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  course['description'],
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
-                Row(
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Course details
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 10.0, bottom: 5.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min, // Use minimum height needed
                   children: [
-                    Icon(Icons.access_time, size: 18, color: Colors.cyan[700]),
-                    const SizedBox(width: 4),
                     Text(
-                      course['duration'],
-                      style: TextStyle(
-                        color: Colors.cyan[700],
-                        fontSize: 14,
+                      course['title'],
+                      style: const TextStyle(
+                        fontSize: 18, // Reduced font size
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(width: 16),
-                    Icon(Icons.person, size: 18, color: Colors.cyan[700]),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        course['instructor'],
-                        style: TextStyle(
-                          color: Colors.cyan[700],
-                          fontSize: 14,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                    const SizedBox(height: 4), // Reduced spacing
+                    Text(
+                      course['description'],
+                      style: TextStyle(
+                        fontSize: 13, // Reduced font size
+                        color: Colors.grey[600],
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(), // Push metadata to bottom
+                    Row(
+                      children: [
+                        Icon(Icons.access_time, size: 16, color: Colors.cyan[700]),
+                        const SizedBox(width: 4),
+                        Text(
+                          course['duration'],
+                          style: TextStyle(
+                            color: Colors.cyan[700],
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Icon(Icons.person, size: 16, color: Colors.cyan[700]),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            instructor['first_name'] ?? course['instructorFirstName'] ?? 'Instructor',
+                            style: TextStyle(
+                              color: Colors.cyan[700],
+                              fontSize: 13,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+            // View details indicator
+            Padding(
+              padding: const EdgeInsets.all(10.0),
+              child: Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Colors.grey[400],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
