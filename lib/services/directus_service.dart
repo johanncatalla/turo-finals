@@ -467,9 +467,12 @@ class DirectusService {
         return {'success': false, 'message': 'Admin token not configured'};
       }
       
-      // Fetch courses with related data
+      print('Fetching courses from Directus...');
+      
+      // FIXED: Request courses with properly expanded tutor relationship chain
+      // Courses -> tutor_id -> Tutors -> user_id -> directus_users
       final response = await http.get(
-        Uri.parse('$baseUrl/items/Courses?fields=*,tutor_id.*,subject_id.*,course_image.*'),
+        Uri.parse('$baseUrl/items/Courses?fields=*,subject_id.*,course_image.*,tutor_id.user_id.*'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $adminToken',
@@ -479,14 +482,45 @@ class DirectusService {
       final data = jsonDecode(response.body);
       
       if (response.statusCode == 200) {
+        print('Successfully fetched ${data['data']?.length ?? 0} courses');
+        
+        // Debug first course structure
+        if (data['data'] is List && data['data'].isNotEmpty) {
+          var firstCourse = data['data'][0];
+          print('First course sample: ${firstCourse['title']}');
+          
+          // Debug the tutor_id relationship
+          if (firstCourse['tutor_id'] != null) {
+            print('Course has tutor_id: ${firstCourse['tutor_id'].runtimeType}');
+            if (firstCourse['tutor_id'] is Map) {
+              print('Tutor details: ${firstCourse['tutor_id']}');
+              
+              // Check if user_id is expanded
+              if (firstCourse['tutor_id']['user_id'] != null && firstCourse['tutor_id']['user_id'] is Map) {
+                var userData = firstCourse['tutor_id']['user_id'];
+                print('Tutor user data: ${userData['first_name']} ${userData['last_name']}');
+              }
+            }
+          } else {
+            print('Course has no tutor_id');
+          }
+          
+          // Debug the junction table data if present
+          if (firstCourse['directus_users'] != null) {
+            print('Course also has directus_users relationship: ${firstCourse['directus_users'].runtimeType}');
+          }
+        }
+        
         return {'success': true, 'data': data['data']};
       } else {
+        print('Error fetching courses: ${data['errors'] != null ? data['errors'][0]['message'] : 'Unknown error'}');
         return {
           'success': false, 
           'message': data['errors']?[0]?['message'] ?? 'Failed to fetch courses'
         };
       }
     } catch (e) {
+      print('Network error fetching courses: ${e.toString()}');
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }

@@ -201,47 +201,62 @@ class CourseProvider extends ChangeNotifier {
     try {
       // First pass: map courses
       final List<Map<String, dynamic>> mappedCourses = directusCourses.map<Map<String, dynamic>>((course) {
-        // Find instructor ID - ensure it's a string
-        String instructorId = '';
+        // Get tutor data from the tutor_id relationship
+        String tutorUserId = '';
+        Map<String, dynamic>? tutorData;
+        
+        // FIXED: First check for tutor_id relationship which is the primary relationship for instructors
         if (course['tutor_id'] != null && course['tutor_id'] is Map) {
-          // Convert any ID to string to ensure type consistency
-          var rawId = course['tutor_id']['id'];
-          instructorId = rawId != null ? rawId.toString() : '';
-          print('Course "${course['title']}" has tutor_id: $instructorId');
+          // If tutor_id is expanded and contains user_id reference
+          if (course['tutor_id']['user_id'] != null && course['tutor_id']['user_id'] is Map) {
+            tutorData = course['tutor_id']['user_id'];
+            tutorUserId = tutorData!['id']?.toString() ?? '';
+            print('Course "${course['title']}" has tutor user from tutor_id.user_id: $tutorUserId (${tutorData['first_name']} ${tutorData['last_name']})');
+          } 
+          // If we just have the tutor record but not expanded user data
+          else {
+            print('Course "${course['title']}" has tutor_id but user_id is not expanded: ${course['tutor_id']}');
+          }
+        }
+        // Fallback to previous directus_users check
+        else if (course['directus_users'] != null && course['directus_users'] is List && course['directus_users'].isNotEmpty) {
+          tutorData = course['directus_users'][0];
+          tutorUserId = tutorData!['id']?.toString() ?? '';
+          print('Course "${course['title']}" has instructor from directus_users: $tutorUserId (${tutorData['first_name']} ${tutorData['last_name']})');
+        }
+        // Last resort, check for tutor_id as a simple ID value
+        else if (course['tutor_id'] != null) {
+          tutorUserId = course['tutor_id'].toString();
+          print('Course "${course['title']}" has simple tutor_id: $tutorUserId (not expanded)');
         } else {
-          print('Course "${course['title']}" has no tutor_id');
+          print('Course "${course['title']}" has no instructor association');
         }
         
-        // Find the instructor index in our list
+        // Find the instructor in our list by matching user ID
         int instructorIndex = -1;
-        if (instructorId.isNotEmpty) {
-          // Try direct match first
-          instructorIndex = _instructors.indexWhere((instructor) => instructor['id'] == instructorId);
-          
-          // If that fails, try string comparison
-          if (instructorIndex == -1) {
-            instructorIndex = _instructors.indexWhere((instructor) => instructor['id'].toString() == instructorId);
-          }
+        if (tutorUserId.isNotEmpty) {
+          instructorIndex = _instructors.indexWhere((instructor) => instructor['id'].toString() == tutorUserId);
           
           if (instructorIndex != -1) {
             print('Found instructor for course "${course['title']}": ${_instructors[instructorIndex]['name']}');
           } else {
-            print('No instructor found for course "${course['title']}" with ID $instructorId');
+            print('No instructor found in cached list for course "${course['title']}" with ID $tutorUserId');
           }
         }
         
-        // Default to first instructor if none found
-        if (instructorIndex == -1 && _instructors.isNotEmpty) {
-          instructorIndex = 0;
-          print('Using default instructor for course "${course['title']}"');
-        }
-        
-        // Get instructor name
+        // Get instructor details
         String instructorName = "Unknown Instructor";
         String instructorFirstName = "Instructor";
+        
+        // If we found the instructor in our list, use that data
         if (instructorIndex >= 0 && instructorIndex < _instructors.length) {
           instructorName = _instructors[instructorIndex]['name'];
           instructorFirstName = _instructors[instructorIndex]['first_name'];
+        } 
+        // If we have expanded tutor user data but it wasn't in our instructor list
+        else if (tutorData != null) {
+          instructorName = '${tutorData['first_name'] ?? ''} ${tutorData['last_name'] ?? ''}';
+          instructorFirstName = tutorData['first_name'] ?? 'Instructor';
         }
         
         // Get course image
@@ -268,6 +283,7 @@ class CourseProvider extends ChangeNotifier {
           'instructorId': instructorIndex,
           'instructorName': instructorName,
           'instructorFirstName': instructorFirstName,
+          'tutorUserId': tutorUserId, // Store the actual tutor user ID for reference
           'duration': '1hr/day', // Default duration
           'image': courseImage,
           'categories': ['Hot', ...tags], // Add "Hot" category by default
