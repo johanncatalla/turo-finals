@@ -1,9 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
 
 class DirectusService {
   final String? baseUrl = dotenv.env['DIRECTUS_API_URL']; 
@@ -295,7 +299,7 @@ class DirectusService {
   }
 
   // Upload a file to Directus
-  Future<Map<String, dynamic>> uploadFile(File file) async {
+  Future<Map<String, dynamic>> uploadFile(dynamic file) async {
     try {
       final adminToken = dotenv.env['ADMIN_TOKEN'];
       
@@ -303,40 +307,73 @@ class DirectusService {
         return {'success': false, 'message': 'Admin token not configured'};
       }
       
-      // Create multipart request
-      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/files'));
-      
-      // Add the file
-      final fileStream = http.ByteStream(file.openRead());
-      final fileLength = await file.length();
-      
-      final multipartFile = http.MultipartFile(
-        'file', 
-        fileStream, 
-        fileLength,
-        filename: 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg'
-      );
-      
-      request.files.add(multipartFile);
+      // Create a multipart request
+      var uri = Uri.parse('$baseUrl/files');
+      var request = http.MultipartRequest('POST', uri);
       
       // Add authorization header
-      request.headers['Authorization'] = 'Bearer $adminToken';
+      request.headers.addAll({
+        'Authorization': 'Bearer $adminToken',
+      });
       
-      // Send request
-      final response = await request.send();
-      final responseData = await response.stream.bytesToString();
-      final data = jsonDecode(responseData);
+      // Handle different file types based on platform
+      if (kIsWeb) {
+        // For web platform, handle XFile or similar web-compatible file types
+        if (file is XFile) {
+          print('Handling web XFile upload');
+          final bytes = await file.readAsBytes();
+          final fileName = file.name;
+          
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              bytes,
+              filename: fileName,
+              contentType: MediaType('image', 'jpeg'),
+            )
+          );
+        } else {
+          return {'success': false, 'message': 'Unsupported file type for web'};
+        }
+      } else {
+        // For native platforms, handle File objects
+        if (file is File) {
+          print('Handling native File upload');
+          final bytes = await file.readAsBytes();
+          final fileName = file.path.split('/').last;
+          
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              bytes,
+              filename: fileName,
+              contentType: MediaType('image', 'jpeg'),
+            )
+          );
+        } else {
+          return {'success': false, 'message': 'Unsupported file type for native'};
+        }
+      }
+      
+      // Send the request
+      print('Sending file upload request');
+      var streamedResponse = await request.send();
+      print('Response status: ${streamedResponse.statusCode}');
+      var response = await http.Response.fromStream(streamedResponse);
       
       if (response.statusCode == 200) {
-        return {'success': true, 'data': data['data']};
+        var responseData = jsonDecode(response.body);
+        return {'success': true, 'data': responseData['data']};
       } else {
+        var responseData = jsonDecode(response.body);
         return {
-          'success': false, 
-          'message': data['errors']?[0]?['message'] ?? 'Failed to upload file'
+          'success': false,
+          'message': responseData['errors']?[0]?['message'] ?? 'Failed to upload file',
         };
       }
     } catch (e) {
-      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+      print('File upload error: ${e.toString()}');
+      return {'success': false, 'message': 'File upload error: ${e.toString()}'};
     }
   }
 
