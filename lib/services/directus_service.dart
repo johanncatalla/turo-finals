@@ -766,7 +766,7 @@ class DirectusService {
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
-}
+
   // Fetch a tutor profile with related data for the current user
   Future<Map<String, dynamic>> fetchTutorProfile() async {
     try {
