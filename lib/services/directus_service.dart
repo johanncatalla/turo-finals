@@ -212,10 +212,35 @@ class DirectusService {
         if (studentResponse.statusCode == 200 && studentData['data'].isNotEmpty) {
           profileData['student_profile'] = studentData['data'][0];
         }
+        
+        // Also fetch enrolled courses for students
+        final enrolledCoursesResponse = await http.get(
+          Uri.parse('$baseUrl/items/junction_directus_users_Courses?filter={"directus_users_id":"$userId"}&fields=*,Courses_id.*,Courses_id.subject_id.*,Courses_id.course_image.*,Courses_id.tutor_id.user_id.*'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $adminToken',
+          },
+        );
+        
+        if (enrolledCoursesResponse.statusCode == 200) {
+          final enrolledCoursesData = jsonDecode(enrolledCoursesResponse.body);
+          final junctionItems = enrolledCoursesData['data'] as List;
+          
+          if (junctionItems.isNotEmpty) {
+            // Extract just the course data for easier use
+            final coursesList = junctionItems.map((item) => item).toList();
+            profileData['enrolled_courses'] = coursesList;
+            print('Loaded ${coursesList.length} enrolled courses for profile');
+          } else {
+            profileData['enrolled_courses'] = [];
+            print('No enrolled courses found for user');
+          }
+        }
       }
 
       return {'success': true, 'data': profileData};
     } catch (e) {
+      print('Error fetching full user profile: ${e.toString()}');
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
