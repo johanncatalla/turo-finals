@@ -4,6 +4,7 @@ import 'package:turo/providers/auth_provider.dart';
 import 'package:turo/Widgets/navbar.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:turo/services/directus_service.dart';
 
 class StudentProfileScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
   bool _isSaving = false;
   String? _errorMessage;
   File? _imageFile;
+  XFile? _webImageFile;
   final DirectusService _directusService = DirectusService();
   
   // Form controllers
@@ -156,7 +158,13 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     
     if (pickedImage != null) {
       setState(() {
-        _imageFile = File(pickedImage.path);
+        if (kIsWeb) {
+          // For web, store the XFile directly
+          _webImageFile = pickedImage;
+        } else {
+          // For native platforms, convert to File
+          _imageFile = File(pickedImage.path);
+        }
       });
     }
   }
@@ -181,20 +189,62 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
 
       // Upload avatar image if selected
       String? avatarId;
-      if (_imageFile != null) {
-        final uploadResponse = await _directusService.uploadFile(_imageFile!);
-        if (uploadResponse['success']) {
-          avatarId = uploadResponse['data']['id'];
-        } else {
-          setState(() {
-            _errorMessage = 'Failed to upload avatar: ${uploadResponse['message']}';
-          });
-          // Continue with the rest of the updates even if avatar upload fails
+      if (kIsWeb && _webImageFile != null) {
+        try {
+          print('Uploading web file: ${_webImageFile!.name}');
+          final uploadResponse = await _directusService.uploadFile(_webImageFile!);
+          
+          if (uploadResponse['success']) {
+            print('Upload success, ID: ${uploadResponse['data']['id']}');
+            avatarId = uploadResponse['data']['id'];
+          } else {
+            print('Upload failed: ${uploadResponse['message']}');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to upload avatar: ${uploadResponse['message']}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        } catch (e) {
+          print('Error during web file upload: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error uploading avatar: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else if (!kIsWeb && _imageFile != null) {
+        try {
+          print('Uploading native file: ${_imageFile!.path}');
+          final uploadResponse = await _directusService.uploadFile(_imageFile!);
+          
+          if (uploadResponse['success']) {
+            print('Upload success, ID: ${uploadResponse['data']['id']}');
+            avatarId = uploadResponse['data']['id'];
+          } else {
+            print('Upload failed: ${uploadResponse['message']}');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to upload avatar: ${uploadResponse['message']}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        } catch (e) {
+          print('Error during native file upload: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error uploading avatar: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       }
 
       // Update user data
-      final userUpdateResponse = await authProvider.updateUserProfile({
+      Map<String, dynamic> updateData = {
         'first_name': _firstNameController.text,
         'last_name': _lastNameController.text,
         'email': _emailController.text,
@@ -202,9 +252,14 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
         'description': _descriptionController.text,
         'mode_preference': _selectedModePreference,
         'profile_complete': true,
-        // Only include avatar if we have a new one
-        if (avatarId != null) 'avatar': avatarId,
-      });
+      };
+      
+      // Only include avatar if we have a new one
+      if (avatarId != null) {
+        updateData['avatar'] = avatarId;
+      }
+      
+      final userUpdateResponse = await authProvider.updateUserProfile(updateData);
       
       if (!userUpdateResponse['success']) {
         setState(() {
@@ -510,15 +565,9 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Icon(Icons.location_on, color: Colors.orange),
-                const SizedBox(width: 12),
-                Text(
-                  userData['location'] ?? 'Not specified',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ],
+            child: Text(
+              userData['location'] ?? 'Not specified',
+              style: const TextStyle(fontSize: 16),
             ),
           ),
         ),
@@ -533,17 +582,24 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildInfoRow(
-                  label: 'Current Grade',
-                  value: grade,
-                  icon: Icons.school,
+                Text(
+                  'Current Grade',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                ),
+                Text(
+                  grade,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
                 const Divider(),
-                _buildInfoRow(
-                  label: 'Learning Level',
-                  value: learnLevel,
-                  icon: Icons.auto_stories,
+                Text(
+                  'Learning Level',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                ),
+                Text(
+                  learnLevel,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -606,7 +662,6 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                     label: Text(subject.toString()),
                     backgroundColor: Colors.grey[200],
                     labelStyle: const TextStyle(color: Colors.black87),
-                    avatar: const Icon(Icons.book, size: 16, color: Colors.orange),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                   );
                 }).toList(),
@@ -621,15 +676,9 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Icon(Icons.book, color: Colors.orange),
-                const SizedBox(width: 12),
-                Text(
-                  '${userData['enrolled_courses'] is List ? userData['enrolled_courses'].length : 0} courses',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ],
+            child: Text(
+              '${userData['enrolled_courses'] is List ? userData['enrolled_courses'].length : 0} courses',
+              style: const TextStyle(fontSize: 16),
             ),
           ),
         ),
@@ -658,34 +707,23 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     );
   }
 
-  Widget _buildInfoRow({required String label, required String value, required IconData icon}) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.orange, size: 20),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
+  
+
+  // Helper method to get the profile image
+  ImageProvider? _getProfileImage(AuthProvider authProvider) {
+    if (kIsWeb && _webImageFile != null) {
+      // For web, we can create a network image from the XFile
+      return NetworkImage(_webImageFile!.path);
+    } else if (!kIsWeb && _imageFile != null) {
+      // For native platforms, use FileImage
+      return FileImage(_imageFile!);
+    } else if (authProvider.fullUserProfile != null && 
+              authProvider.fullUserProfile!['avatar'] != null) {
+      // Use the existing avatar
+      return NetworkImage(_directusService.getAssetUrl(
+          authProvider.fullUserProfile!['avatar']));
+    }
+    return null;
   }
 
   Widget _buildEditProfileForm() {
@@ -701,14 +739,8 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
               CircleAvatar(
                 radius: 60,
                 backgroundColor: Colors.grey[200],
-                backgroundImage: _imageFile != null 
-                    ? FileImage(_imageFile!) 
-                    : (authProvider.fullUserProfile != null && 
-                       authProvider.fullUserProfile!['avatar'] != null)
-                        ? NetworkImage(_directusService.getAssetUrl(
-                            authProvider.fullUserProfile!['avatar']))
-                        : null,
-                child: (_imageFile == null && (
+                backgroundImage: _getProfileImage(authProvider),
+                child: (_imageFile == null && _webImageFile == null && (
                         authProvider.fullUserProfile == null || 
                         authProvider.fullUserProfile!['avatar'] == null))
                     ? const Icon(Icons.person, size: 60, color: Colors.white)
