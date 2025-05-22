@@ -11,6 +11,7 @@ class CourseProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _instructors = [];
   List<Map<String, dynamic>> _courses = [];
   List<Map<String, dynamic>> _subjects = [];
+  List<Map<String, dynamic>> _enrolledCourses = [];
   
   // Getters
   bool get isLoading => _isLoading;
@@ -18,6 +19,7 @@ class CourseProvider extends ChangeNotifier {
   List<Map<String, dynamic>> get instructors => _instructors;
   List<Map<String, dynamic>> get courses => _courses;
   List<Map<String, dynamic>> get subjects => _subjects;
+  List<Map<String, dynamic>> get enrolledCourses => _enrolledCourses;
   
   // Initialize data
   Future<void> initialize() async {
@@ -394,5 +396,68 @@ class CourseProvider extends ChangeNotifier {
   String getAssetUrl(String? assetId) {
     if (assetId == null || assetId.isEmpty) return '';
     return _directusService.getAssetUrl(assetId);
+  }
+  
+  // Enroll a user in a course
+  Future<Map<String, dynamic>> enrollInCourse(String userId, String courseId) async {
+    try {
+      // Set loading state
+      _isLoading = true;
+      notifyListeners();
+      
+      final response = await _directusService.enrollInCourse(userId, courseId);
+      
+      // Reset loading state
+      _isLoading = false;
+      notifyListeners();
+      
+      if (response['success']) {
+        // If enrollment was successful, refresh the enrolled courses
+        await fetchEnrolledCourses(userId);
+      }
+      
+      return response;
+    } catch (e) {
+      _error = 'Error enrolling in course: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+      return {'success': false, 'message': _error};
+    }
+  }
+  
+  // Check if a user is enrolled in a specific course
+  Future<bool> isEnrolledInCourse(String userId, String courseId) async {
+    try {
+      final response = await _directusService.checkEnrollmentStatus(userId, courseId);
+      
+      if (response['success']) {
+        return response['isEnrolled'] ?? false;
+      } else {
+        _error = response['message'];
+        return false;
+      }
+    } catch (e) {
+      _error = 'Error checking enrollment status: ${e.toString()}';
+      return false;
+    }
+  }
+  
+  // Fetch courses a user is enrolled in
+  Future<void> fetchEnrolledCourses(String userId) async {
+    try {
+      final response = await _directusService.getEnrolledCourses(userId);
+      
+      if (response['success']) {
+        _enrolledCourses = _mapDirectusCoursesToCourses(response['data']);
+        print('Loaded ${_enrolledCourses.length} enrolled courses');
+      } else {
+        _error = response['message'];
+      }
+      
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to load enrolled courses: ${e.toString()}';
+      notifyListeners();
+    }
   }
 } 

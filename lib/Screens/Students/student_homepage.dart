@@ -152,11 +152,19 @@ class _StudentHomepageState extends State<StudentHomepage> {
         Navigator.pushReplacementNamed(context, '/search');
         break;
       case 2:
-      // Navigate to my courses (if route exists)
+      // Navigate to my courses
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final courseProvider = Provider.of<CourseProvider>(context, listen: false);
+        
+        // Pre-fetch enrolled courses for a smoother experience
+        if (authProvider.status == AuthStatus.authenticated && authProvider.user != null) {
+          courseProvider.fetchEnrolledCourses(authProvider.user!.id);
+        }
+        
         Navigator.pushReplacementNamed(context, '/courses');
         break;
       case 3:
-      // Navigate to profile (if route exists)
+      // Navigate to profile
         Navigator.pushReplacementNamed(context, '/profile');
         break;
     }
