@@ -20,7 +20,7 @@ class StudentHomepage extends StatefulWidget {
 class _StudentHomepageState extends State<StudentHomepage> {
   // Tab selection state
   int _selectedCourseTab = 0;
-  final List<String> _courseTabs = ['Hot', 'Programming', 'Language', 'Math'];
+  List<String> _courseTabs = ['Hot'];
   
   // Selected menu item
   int _selectedMenuIndex = 0;
@@ -59,7 +59,45 @@ class _StudentHomepageState extends State<StudentHomepage> {
   void _initializeData() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final courseProvider = Provider.of<CourseProvider>(context, listen: false);
-      courseProvider.initialize();
+      courseProvider.initialize().then((_) {
+        // After initialization, update the course tabs with available subjects
+        _updateCourseTabs();
+      });
+    });
+  }
+  
+  // Update course tabs based on available subjects
+  void _updateCourseTabs() {
+    final courseProvider = Provider.of<CourseProvider>(context, listen: false);
+    final subjects = courseProvider.subjects;
+    
+    // Create a set of unique subject names from courses
+    final Set<String> subjectNames = {};
+    
+    // Add all subject names from the subjects list
+    for (var subject in subjects) {
+      final name = subject['name'];
+      if (name != null && name.isNotEmpty) {
+        subjectNames.add(name);
+      }
+    }
+    
+    // Fallback to default categories if no subjects found
+    if (subjectNames.isEmpty) {
+      setState(() {
+        _courseTabs = ['Hot', 'Programming', 'Language', 'Math'];
+      });
+      return;
+    }
+    
+    // Update the tabs with 'Hot' first, followed by subject names
+    setState(() {
+      _courseTabs = ['Hot', ...subjectNames];
+      
+      // Reset the selected tab if it's out of bounds
+      if (_selectedCourseTab >= _courseTabs.length) {
+        _selectedCourseTab = 0;
+      }
     });
   }
 
@@ -114,11 +152,19 @@ class _StudentHomepageState extends State<StudentHomepage> {
         Navigator.pushReplacementNamed(context, '/search');
         break;
       case 2:
-      // Navigate to my courses (if route exists)
+      // Navigate to my courses
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final courseProvider = Provider.of<CourseProvider>(context, listen: false);
+        
+        // Pre-fetch enrolled courses for a smoother experience
+        if (authProvider.status == AuthStatus.authenticated && authProvider.user != null) {
+          courseProvider.fetchEnrolledCourses(authProvider.user!.id);
+        }
+        
         Navigator.pushReplacementNamed(context, '/courses');
         break;
       case 3:
-      // Navigate to profile (if route exists)
+      // Navigate to profile
         Navigator.pushReplacementNamed(context, '/profile');
         break;
     }
@@ -535,9 +581,12 @@ class _StudentHomepageState extends State<StudentHomepage> {
     // Filter courses based on selected tab
     final String selectedCategory = _courseTabs[_selectedCourseTab];
     final courses = courseProvider.courses;
-    final filteredCourses = courses.where((course) {
-      return course['categories'].contains(selectedCategory);
-    }).toList();
+    
+    // If 'Hot' is selected, show all courses
+    // Otherwise filter by the selected subject name
+    final filteredCourses = selectedCategory == 'Hot' 
+        ? courses 
+        : courseProvider.getCoursesBySubjectName(selectedCategory);
 
     // Calculate the minimum height for 3 items
     // Each course item is about 140 pixels high (120px image height + margins)

@@ -10,12 +10,16 @@ class CourseProvider extends ChangeNotifier {
   
   List<Map<String, dynamic>> _instructors = [];
   List<Map<String, dynamic>> _courses = [];
+  List<Map<String, dynamic>> _subjects = [];
+  List<Map<String, dynamic>> _enrolledCourses = [];
   
   // Getters
   bool get isLoading => _isLoading;
   String? get error => _error;
   List<Map<String, dynamic>> get instructors => _instructors;
   List<Map<String, dynamic>> get courses => _courses;
+  List<Map<String, dynamic>> get subjects => _subjects;
+  List<Map<String, dynamic>> get enrolledCourses => _enrolledCourses;
   
   // Initialize data
   Future<void> initialize() async {
@@ -26,7 +30,10 @@ class CourseProvider extends ChangeNotifier {
     try {
       print('Initializing CourseProvider...');
       
-      // First, fetch instructors
+      // Fetch subjects first
+      await fetchSubjects();
+      
+      // Then fetch instructors
       await fetchInstructors();
       
       // Only fetch courses after instructors are loaded
@@ -43,6 +50,44 @@ class CourseProvider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+  
+  // Fetch subjects from Directus
+  Future<void> fetchSubjects() async {
+    try {
+      print('Fetching subjects from Directus...');
+      final response = await _directusService.getSubjects();
+      
+      if (response['success']) {
+        if (response['data'] == null) {
+          print('Received null data from getSubjects()');
+          _error = 'Received null data from server';
+          return;
+        }
+        
+        if (!(response['data'] is List)) {
+          print('Expected a List of subjects but got: ${response['data'].runtimeType}');
+          _error = 'Received invalid data format';
+          return;
+        }
+        
+        print('Received ${response['data'].length} subjects from Directus');
+        
+        // Map subjects to a more usable format
+        _subjects = response['data'].map<Map<String, dynamic>>((subject) {
+          return {
+            'id': subject['id']?.toString() ?? '',
+            'name': subject['subject_name'] ?? 'Unknown Subject',
+          };
+        }).toList();
+        
+        print('Mapped ${_subjects.length} subjects');
+      } else {
+        print('Error from getSubjects(): ${response['message']}');
+      }
+    } catch (e) {
+      print('Exception in fetchSubjects: ${e.toString()}');
     }
   }
   
@@ -266,13 +311,18 @@ class CourseProvider extends ChangeNotifier {
           courseImage = imageId != null ? imageId.toString() : courseImage;
         }
         
-        // Get subject tags
-        List<String> tags = [];
+        // Get subject information
+        String subjectId = '';
+        String subjectName = '';
         if (course['subject_id'] != null && course['subject_id'] is Map) {
-          String subjectName = course['subject_id']['subject_name'] ?? '';
-          if (subjectName.isNotEmpty) {
-            tags.add(subjectName);
-          }
+          subjectId = course['subject_id']['id']?.toString() ?? '';
+          subjectName = course['subject_id']['subject_name'] ?? '';
+        }
+        
+        // Get or create categories list including "Hot" by default
+        List<String> categories = ['Hot'];
+        if (subjectName.isNotEmpty) {
+          categories.add(subjectName);
         }
         
         // Map to course format
@@ -286,11 +336,12 @@ class CourseProvider extends ChangeNotifier {
           'tutorUserId': tutorUserId, // Store the actual tutor user ID for reference
           'duration': '1hr/day', // Default duration
           'image': courseImage,
-          'categories': ['Hot', ...tags], // Add "Hot" category by default
+          'categories': categories,
           'lessons': 12, // Default lessons count
           'level': 'Beginner', // Default level
           'rating': 4.5, // Default rating
-          'tags': tags.isEmpty ? ['General'] : tags,
+          'subjectId': subjectId,
+          'subjectName': subjectName,
         };
       }).toList();
       
@@ -323,9 +374,90 @@ class CourseProvider extends ChangeNotifier {
     }
   }
   
+  // Get courses filtered by subject ID
+  List<Map<String, dynamic>> getCoursesBySubject(String subjectId) {
+    if (subjectId.isEmpty) return _courses;
+    
+    return _courses.where((course) => 
+      course['subjectId'] == subjectId
+    ).toList();
+  }
+  
+  // Get courses filtered by subject name
+  List<Map<String, dynamic>> getCoursesBySubjectName(String subjectName) {
+    if (subjectName.isEmpty) return _courses;
+    
+    return _courses.where((course) => 
+      course['categories'].contains(subjectName)
+    ).toList();
+  }
+  
   // Get asset URL for images
   String getAssetUrl(String? assetId) {
     if (assetId == null || assetId.isEmpty) return '';
     return _directusService.getAssetUrl(assetId);
+  }
+  
+  // Enroll a user in a course
+  Future<Map<String, dynamic>> enrollInCourse(String userId, String courseId) async {
+    try {
+      // Set loading state
+      _isLoading = true;
+      notifyListeners();
+      
+      final response = await _directusService.enrollInCourse(userId, courseId);
+      
+      // Reset loading state
+      _isLoading = false;
+      notifyListeners();
+      
+      if (response['success']) {
+        // If enrollment was successful, refresh the enrolled courses
+        await fetchEnrolledCourses(userId);
+      }
+      
+      return response;
+    } catch (e) {
+      _error = 'Error enrolling in course: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+      return {'success': false, 'message': _error};
+    }
+  }
+  
+  // Check if a user is enrolled in a specific course
+  Future<bool> isEnrolledInCourse(String userId, String courseId) async {
+    try {
+      final response = await _directusService.checkEnrollmentStatus(userId, courseId);
+      
+      if (response['success']) {
+        return response['isEnrolled'] ?? false;
+      } else {
+        _error = response['message'];
+        return false;
+      }
+    } catch (e) {
+      _error = 'Error checking enrollment status: ${e.toString()}';
+      return false;
+    }
+  }
+  
+  // Fetch courses a user is enrolled in
+  Future<void> fetchEnrolledCourses(String userId) async {
+    try {
+      final response = await _directusService.getEnrolledCourses(userId);
+      
+      if (response['success']) {
+        _enrolledCourses = _mapDirectusCoursesToCourses(response['data']);
+        print('Loaded ${_enrolledCourses.length} enrolled courses');
+      } else {
+        _error = response['message'];
+      }
+      
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to load enrolled courses: ${e.toString()}';
+      notifyListeners();
+    }
   }
 } 

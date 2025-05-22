@@ -556,4 +556,217 @@ class DirectusService {
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
+  
+  // Fetch all subjects
+  Future<Map<String, dynamic>> getSubjects() async {
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+      
+      print('Fetching subjects from Directus...');
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/items/Subjects?fields=*'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+      
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200) {
+        print('Successfully fetched ${data['data']?.length ?? 0} subjects');
+        return {'success': true, 'data': data['data']};
+      } else {
+        print('Error fetching subjects: ${data['errors'] != null ? data['errors'][0]['message'] : 'Unknown error'}');
+        return {
+          'success': false, 
+          'message': data['errors']?[0]?['message'] ?? 'Failed to fetch subjects'
+        };
+      }
+    } catch (e) {
+      print('Network error fetching subjects: ${e.toString()}');
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
+  
+  // Enroll a student in a course (add course to user's enrolled_courses)
+  Future<Map<String, dynamic>> enrollInCourse(String userId, String courseId) async {
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+      
+      print('Enrolling user $userId in course $courseId...');
+      
+      // First, check if the user is already enrolled in this course
+      final checkResponse = await http.get(
+        Uri.parse('$baseUrl/users/$userId?fields=enrolled_courses.*'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+      
+      if (checkResponse.statusCode != 200) {
+        final errorData = jsonDecode(checkResponse.body);
+        return {
+          'success': false, 
+          'message': errorData['errors']?[0]?['message'] ?? 'Failed to check enrollment status'
+        };
+      }
+      
+      final userData = jsonDecode(checkResponse.body)['data'];
+      final enrolledCourses = userData['enrolled_courses'] ?? [];
+      
+      // Check if already enrolled
+      bool alreadyEnrolled = false;
+      if (enrolledCourses is List) {
+        alreadyEnrolled = enrolledCourses.any((course) => 
+          course is Map && course['id'] != null && course['id'].toString() == courseId
+        );
+      }
+      
+      if (alreadyEnrolled) {
+        return {'success': false, 'message': 'Already enrolled in this course', 'alreadyEnrolled': true};
+      }
+      
+      // Create a booking for this enrollment
+      final bookingResponse = await http.post(
+        Uri.parse('$baseUrl/items/Bookings'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+        body: jsonEncode({
+          'client_id': userId,
+          'course_id': courseId,
+          'status': 'Active',
+          'payment_status': 'Paid',
+        }),
+      );
+      
+      if (bookingResponse.statusCode != 200) {
+        final errorData = jsonDecode(bookingResponse.body);
+        return {
+          'success': false, 
+          'message': errorData['errors']?[0]?['message'] ?? 'Failed to create booking'
+        };
+      }
+      
+      // Create an entry in the junction table to connect the user with the course
+      final enrollResponse = await http.post(
+        Uri.parse('$baseUrl/items/junction_directus_users_Courses'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+        body: jsonEncode({
+          'directus_users_id': userId,
+          'Courses_id': courseId
+        }),
+      );
+      
+      if (enrollResponse.statusCode == 200) {
+        print('Successfully enrolled user in course');
+        return {'success': true, 'message': 'Successfully enrolled in course'};
+      } else {
+        final errorData = jsonDecode(enrollResponse.body);
+        return {
+          'success': false, 
+          'message': errorData['errors']?[0]?['message'] ?? 'Failed to enroll in course'
+        };
+      }
+    } catch (e) {
+      print('Error enrolling in course: ${e.toString()}');
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
+  
+  // Check if a user is enrolled in a specific course
+  Future<Map<String, dynamic>> checkEnrollmentStatus(String userId, String courseId) async {
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+      
+      // Query the junction table directly
+      final response = await http.get(
+        Uri.parse('$baseUrl/items/junction_directus_users_Courses?filter={"directus_users_id":"$userId","Courses_id":"$courseId"}&limit=1'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final items = data['data'] as List;
+        
+        return {
+          'success': true, 
+          'isEnrolled': items.isNotEmpty
+        };
+      } else {
+        final errorData = jsonDecode(response.body);
+        return {
+          'success': false, 
+          'message': errorData['errors']?[0]?['message'] ?? 'Failed to check enrollment status'
+        };
+      }
+    } catch (e) {
+      print('Error checking enrollment: ${e.toString()}');
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
+  
+  // Get all courses a user is enrolled in
+  Future<Map<String, dynamic>> getEnrolledCourses(String userId) async {
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+      
+      // Get the enrolled courses through the junction table
+      final response = await http.get(
+        Uri.parse('$baseUrl/items/junction_directus_users_Courses?filter={"directus_users_id":"$userId"}&fields=*,Courses_id.*,Courses_id.subject_id.*,Courses_id.course_image.*,Courses_id.tutor_id.user_id.*'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final junctionItems = data['data'] as List;
+        
+        // Map junction items to the actual courses
+        final courses = junctionItems.map((item) => item['Courses_id']).toList();
+        
+        return {
+          'success': true, 
+          'data': courses
+        };
+      } else {
+        final errorData = jsonDecode(response.body);
+        return {
+          'success': false, 
+          'message': errorData['errors']?[0]?['message'] ?? 'Failed to fetch enrolled courses'
+        };
+      }
+    } catch (e) {
+      print('Error fetching enrolled courses: ${e.toString()}');
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
 }
