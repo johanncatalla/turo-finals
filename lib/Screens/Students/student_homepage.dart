@@ -8,6 +8,7 @@ import 'package:turo/Screens/Students/all_instructors_screen.dart';
 import 'package:turo/Screens/Students/all_courses_screen.dart';
 import 'package:turo/Screens/Students/course_detail_screen.dart';
 import 'package:turo/Screens/Students/instructor_detail_screen.dart';
+import 'package:turo/Screens/Students/search.dart';
 
 class StudentHomepage extends StatefulWidget {
   const StudentHomepage({super.key});
@@ -197,10 +198,11 @@ class _StudentHomepageState extends State<StudentHomepage> {
               
                   // Courses Section
                   _buildSectionHeader('Courses', () {
-                    Navigator.push(
+                    // Navigate to search screen with Course filter pre-selected
+                    Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => AllCoursesScreen(courses: courseProvider.courses),
+                        builder: (context) => Search(initialMode: 1), // 1 = Course mode
                       ),
                     );
                   }),
@@ -572,12 +574,22 @@ class _StudentHomepageState extends State<StudentHomepage> {
 
   // Individual course item
   Widget _buildCourseItem(Map<String, dynamic> course, CourseProvider courseProvider) {
-    // Get instructor data from the ID
-    final int instructorId = course['instructorId'] is int ? course['instructorId'] : 0;
+    // Get instructor data
+    final String tutorUserId = course['tutorUserId'] ?? '';
     final instructors = courseProvider.instructors;
-    final Map<String, dynamic> instructor = instructorId >= 0 && instructorId < instructors.length
-        ? instructors[instructorId]
-        : {'name': course['instructorName'] ?? 'Unknown Instructor'};
+    
+    // Try to find instructor by ID
+    Map<String, dynamic> instructor = {
+      'first_name': course['instructorFirstName'] ?? 'Instructor',
+      'name': course['instructorName'] ?? 'Instructor'
+    };
+    
+    if (tutorUserId.isNotEmpty) {
+      final int instructorIndex = instructors.indexWhere((inst) => inst['id'].toString() == tutorUserId);
+      if (instructorIndex >= 0) {
+        instructor = instructors[instructorIndex];
+      }
+    }
     
     return GestureDetector(
       onTap: () {
@@ -677,7 +689,7 @@ class _StudentHomepageState extends State<StudentHomepage> {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            instructor['first_name'] ?? course['instructorFirstName'] ?? 'Instructor',
+                            instructor['name'] ?? instructor['instructorName'] ?? 'Instructor',
                             style: TextStyle(
                               color: Colors.cyan[700],
                               fontSize: 13,

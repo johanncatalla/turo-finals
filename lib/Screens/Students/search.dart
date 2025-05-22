@@ -11,7 +11,9 @@ import 'student_homepage.dart' as homepage;
 import 'package:turo/providers/course_provider.dart';
 
 class Search extends StatefulWidget {
-  const Search({super.key});
+  final int? initialMode; // Add parameter for initial mode (0=Tutor, 1=Course, 2=Module)
+  
+  const Search({this.initialMode, super.key});
 
   @override
   State<Search> createState() => _SearchState();
@@ -118,6 +120,11 @@ class _SearchState extends State<Search> {
   @override
   void initState() {
     super.initState();
+    // Initialize with provided mode if available
+    if (widget.initialMode != null && widget.initialMode! >= 0 && widget.initialMode! <= 2) {
+      selectedMode = widget.initialMode!;
+    }
+    
     // Initialize filtered lists
     _filteredTutors = List.from(_tutors);
     _filteredCourses = List.from(_courses);

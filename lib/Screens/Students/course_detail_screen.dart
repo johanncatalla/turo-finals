@@ -214,7 +214,9 @@ class CourseDetailScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.orange, width: 2),
                   image: DecorationImage(
-                    image: AssetImage(instructor['image']),
+                    image: instructor['image'] != null && instructor['image'].toString().isNotEmpty
+                        ? NetworkImage(Provider.of<CourseProvider>(context, listen: false).getAssetUrl(instructor['image']))
+                        : const AssetImage('assets/joshua.png') as ImageProvider,
                     fit: BoxFit.cover,
                   ),
                 ),

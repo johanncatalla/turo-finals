@@ -30,11 +30,11 @@ class InstructorDetailScreen extends StatelessWidget {
                 children: [
                   // Instructor image
                   Container(
-                    width: 120,
-                    height: 120,
+                    width: 60,
+                    height: 60,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.orange, width: 3),
+                      border: Border.all(color: Colors.orange, width: 2),
                       image: DecorationImage(
                         image: instructor['image'] != null && instructor['image'].toString().isNotEmpty
                             ? NetworkImage(courseProvider.getAssetUrl(instructor['image']))
@@ -227,19 +227,50 @@ class InstructorDetailScreen extends StatelessWidget {
   }
   
   Widget _buildCoursesList() {
-    // This would ideally come from the instructor data
-    final List<Map<String, dynamic>> courses = instructor['teachingCourses'] ?? [
-      {
-        'title': 'Introduction to Python',
-        'students': 120,
-        'rating': 4.8,
-      },
-      {
-        'title': 'Advanced Data Structures',
-        'students': 85,
-        'rating': 4.6,
-      },
-    ];
+    // Extract teachingCourses with proper type safety
+    List<Map<String, dynamic>> courses = [];
+    
+    // Check if teachingCourses exists and handle different types
+    if (instructor.containsKey('teachingCourses')) {
+      final teachingCourses = instructor['teachingCourses'];
+      
+      if (teachingCourses is List) {
+        // Convert each item to Map<String, dynamic> with type safety
+        courses = teachingCourses.map<Map<String, dynamic>>((course) {
+          if (course is Map) {
+            // Convert to Map<String, dynamic> with proper type safety
+            return {
+              'title': course['title']?.toString() ?? 'Untitled Course',
+              'students': course['students'] is num ? course['students'] : 0,
+              'rating': course['rating'] is num ? course['rating'] : 4.5,
+            };
+          } else {
+            // Default for non-map items
+            return {
+              'title': 'Untitled Course',
+              'students': 0,
+              'rating': 4.5,
+            };
+          }
+        }).toList();
+      }
+    }
+    
+    // Use fallback if no courses were found
+    if (courses.isEmpty) {
+      courses = [
+        {
+          'title': 'Introduction to Python',
+          'students': 120,
+          'rating': 4.8,
+        },
+        {
+          'title': 'Advanced Data Structures',
+          'students': 85,
+          'rating': 4.6,
+        },
+      ];
+    }
     
     return Column(
       children: courses.map((course) {
