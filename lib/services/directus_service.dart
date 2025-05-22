@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -73,7 +75,8 @@ class DirectusService {
           'email': email,
           'password': password,
           'user_type': normalizedAccountType,
-          'role': normalizedAccountType == 'Student' ? 'e492a4a1-4f3f-42f2-a63e-5fa988dacb33' : null,
+          'role': normalizedAccountType == 'Student' ? 'e492a4a1-4f3f-42f2-a63e-5fa988dacb33' :
+                 normalizedAccountType == 'Tutor' ? 'f3742571-de1f-4a19-a249-743834adb070' : null,
           'status': 'active', // Set status to active for immediate access
         }),
       );
@@ -127,6 +130,128 @@ class DirectusService {
     }
   }
 
+  // Update user profile
+  Future<Map<String, dynamic>> updateUserProfile(String userId, Map<String, dynamic> userData) async {
+    try {
+      // Use admin token for guaranteed access
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      final response = await http.patch(
+        Uri.parse('$baseUrl/users/$userId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+        body: jsonEncode(userData),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': data['data']};
+      } else {
+        return {
+          'success': false,
+          'message': data['errors']?[0]?['message'] ?? 'Failed to update profile'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
+
+  // Get full user profile including student/tutor specific data
+  Future<Map<String, dynamic>> getFullUserProfile(String userId) async {
+    try {
+      // Use admin token for guaranteed access
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      // First, get basic user data
+      final userResponse = await http.get(
+        Uri.parse('$baseUrl/users/$userId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+
+      final userData = jsonDecode(userResponse.body);
+
+      if (userResponse.statusCode != 200) {
+        return {
+          'success': false,
+          'message': userData['errors']?[0]?['message'] ?? 'Failed to fetch user data'
+        };
+      }
+
+      final userType = userData['data']['user_type'];
+      Map<String, dynamic> profileData = userData['data'];
+
+      // If user is a student, get student profile data
+      if (userType == 'Student') {
+        final studentResponse = await http.get(
+          Uri.parse('$baseUrl/items/Students?filter={"user_id":"$userId"}'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $adminToken',
+          },
+        );
+
+        final studentData = jsonDecode(studentResponse.body);
+
+        if (studentResponse.statusCode == 200 && studentData['data'].isNotEmpty) {
+          profileData['student_profile'] = studentData['data'][0];
+        }
+      }
+
+      return {'success': true, 'data': profileData};
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
+
+  // Update student profile (in the Students collection)
+  Future<Map<String, dynamic>> updateStudentProfile(String studentId, Map<String, dynamic> profileData) async {
+    try {
+      // Use admin token for guaranteed access
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      final response = await http.patch(
+        Uri.parse('$baseUrl/items/Students/$studentId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+        body: jsonEncode(profileData),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': data['data']};
+      } else {
+        return {
+          'success': false,
+          'message': data['errors']?[0]?['message'] ?? 'Failed to update student profile'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
+
   // Save authentication data to SharedPreferences
   Future<void> _saveAuthData(Map<String, dynamic> authData) async {
     final prefs = await SharedPreferences.getInstance();
@@ -154,6 +279,64 @@ class DirectusService {
     if (expiresAt == null) return true;
 
     return DateTime.now().millisecondsSinceEpoch > expiresAt;
+  }
+
+  // Get the full URL for a Directus asset
+  String getAssetUrl(dynamic assetId) {
+    if (assetId == null) return '';
+
+    // Get admin token for authentication
+    final adminToken = dotenv.env['ADMIN_TOKEN'];
+    if (adminToken == null) return '';
+
+    // Add token as query parameter for authentication
+    return '$baseUrl/assets/$assetId?access_token=$adminToken';
+  }
+
+  // Upload a file to Directus
+  Future<Map<String, dynamic>> uploadFile(File file) async {
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      // Create multipart request
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/files'));
+
+      // Add the file
+      final fileStream = http.ByteStream(file.openRead());
+      final fileLength = await file.length();
+
+      final multipartFile = http.MultipartFile(
+        'file',
+        fileStream,
+        fileLength,
+        filename: 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg'
+      );
+
+      request.files.add(multipartFile);
+
+      // Add authorization header
+      request.headers['Authorization'] = 'Bearer $adminToken';
+
+      // Send request
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+      final data = jsonDecode(responseData);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': data['data']};
+      } else {
+        return {
+          'success': false,
+          'message': data['errors']?[0]?['message'] ?? 'Failed to upload file'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
   }
 
   // Refresh the token if expired

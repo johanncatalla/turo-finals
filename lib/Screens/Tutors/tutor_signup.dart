@@ -189,26 +189,38 @@ class _TutorSignUpScreenState extends State<TutorSignUpScreen> {
 
   /// Password Field with Visibility Toggle
   Widget _buildPasswordField() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextFormField(
-        controller: _passwordController,
-        obscureText: _obscurePassword,
-        decoration: InputDecoration(
-          hintText: 'Password',
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          filled: true,
-          fillColor: Colors.grey[200],
-          suffixIcon: IconButton(
-            icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-            onPressed: () {
-              setState(() {
-                _obscurePassword = !_obscurePassword;
-              });
-            },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: TextFormField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            decoration: InputDecoration(
+              hintText: 'Password',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              filled: true,
+              fillColor: Colors.grey[200],
+              suffixIcon: IconButton(
+                icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              ),
+            ),
           ),
         ),
-      ),
+        Padding(
+          padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
+          child: Text(
+            'Password must contain at least 8 characters, 1 uppercase letter, and 1 alphanumeric character.',
+            style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+          ),
+        ),
+      ],
     );
   }
 
@@ -248,10 +260,21 @@ class _TutorSignUpScreenState extends State<TutorSignUpScreen> {
       return;
     }
 
-    // Validate password strength (at least 6 characters)
-    if (_passwordController.text.length < 6) {
+    // Password validation
+    final password = _passwordController.text;
+    if (password.length < 8) {
       setState(() {
-        _errorMessage = "Password must be at least 6 characters long";
+        _errorMessage = "Password must be at least 8 characters long";
+      });
+      return;
+    }
+    
+    final hasUppercase = password.contains(RegExp(r'[A-Z]'));
+    final hasAlphanumeric = password.contains(RegExp(r'[0-9]'));
+    
+    if (!hasUppercase || !hasAlphanumeric) {
+      setState(() {
+        _errorMessage = "Password must contain at least one uppercase letter and one number";
       });
       return;
     }
@@ -270,7 +293,7 @@ class _TutorSignUpScreenState extends State<TutorSignUpScreen> {
         lastName: _lastNameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
-        accountType: 'tutor',
+        accountType: 'Tutor',
       );
 
       if (success) {
