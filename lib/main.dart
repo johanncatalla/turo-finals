@@ -4,6 +4,7 @@ import 'package:turo/role_select.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:turo/providers/auth_provider.dart';
+import 'package:turo/providers/course_provider.dart';
 import 'package:turo/Screens/Students/student_homepage.dart';
 import 'package:turo/Screens/Students/my_courses_screen.dart';
 import 'package:turo/Screens/Students/student_profile_screen.dart';
@@ -13,8 +14,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AuthProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => CourseProvider()),
+      ],
       child: const MyApp(),
     ),
   );

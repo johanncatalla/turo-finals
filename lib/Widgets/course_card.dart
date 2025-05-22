@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turo/providers/course_provider.dart';
 
 class CourseCard extends StatelessWidget {
   final Map<String, dynamic> course;
@@ -12,6 +14,8 @@ class CourseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final courseProvider = Provider.of<CourseProvider>(context);
+    
     return GestureDetector(
       onTap: onViewCourse,
       child: Container(
@@ -25,10 +29,18 @@ class CourseCard extends StatelessWidget {
               child: SizedBox(
                 width: 80,
                 height: 80,
-                child: Image.asset(
-                  course['image'],
-                  fit: BoxFit.cover,
-                ),
+                child: course['image'] != null && !course['image'].toString().startsWith('assets/')
+                    ? Image.network(
+                        courseProvider.getAssetUrl(course['image']),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Image.asset('assets/courses/python.png', fit: BoxFit.cover);
+                        },
+                      )
+                    : Image.asset(
+                        'assets/courses/python.png',
+                        fit: BoxFit.cover,
+                      ),
               ),
             ),
             const SizedBox(width: 15),
@@ -93,7 +105,7 @@ class CourseCard extends StatelessWidget {
         ),
         const SizedBox(width: 5),
         Text(
-          course['schedule'],
+          course['duration'] ?? '1hr/day',
           style: const TextStyle(
             fontSize: 12,
             color: Colors.grey,
@@ -115,7 +127,7 @@ class CourseCard extends StatelessWidget {
         ),
         const SizedBox(width: 5),
         Text(
-          course['instructor'],
+          course['instructorName'] ?? 'Instructor',
           style: const TextStyle(
             fontSize: 12,
             color: Colors.grey,
