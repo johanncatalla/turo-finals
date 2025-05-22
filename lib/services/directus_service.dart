@@ -409,4 +409,117 @@ class DirectusService {
     
     return true;
   }
+  
+  // Fetch all tutors (instructors)
+  Future<Map<String, dynamic>> getTutors() async {
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+      
+      print('Fetching tutors from Directus...');
+      
+      // Fetch users with user_type = Tutor and include their tutor profiles
+      // Make sure to expand the tutor_profile properly since it's an O2M relationship
+      final response = await http.get(
+        Uri.parse('$baseUrl/users?filter={"user_type":"Tutor"}&fields=*,tutor_profile.*,subjects.*'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+      
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200) {
+        print('Successfully fetched ${data['data']?.length ?? 0} tutors');
+        
+        // Debug first tutor structure
+        if (data['data'] is List && data['data'].isNotEmpty) {
+          var firstTutor = data['data'][0];
+          print('First tutor sample: ${firstTutor['first_name']} ${firstTutor['last_name']}');
+          print('Tutor profile type: ${firstTutor['tutor_profile'].runtimeType}');
+          print('Subjects type: ${firstTutor['subjects'].runtimeType}');
+        }
+        
+        return {'success': true, 'data': data['data']};
+      } else {
+        print('Error fetching tutors: ${data['errors'] != null ? data['errors'][0]['message'] : 'Unknown error'}');
+        return {
+          'success': false, 
+          'message': data['errors']?[0]?['message'] ?? 'Failed to fetch tutors'
+        };
+      }
+    } catch (e) {
+      print('Network error fetching tutors: ${e.toString()}');
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
+  
+  // Fetch all courses
+  Future<Map<String, dynamic>> getCourses() async {
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+      
+      // Fetch courses with related data
+      final response = await http.get(
+        Uri.parse('$baseUrl/items/Courses?fields=*,tutor_id.*,subject_id.*,course_image.*'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+      
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': data['data']};
+      } else {
+        return {
+          'success': false, 
+          'message': data['errors']?[0]?['message'] ?? 'Failed to fetch courses'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
+  
+  // Get course details by ID
+  Future<Map<String, dynamic>> getCourseById(String courseId) async {
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/items/Courses/$courseId?fields=*,tutor_id.*,subject_id.*,course_image.*,modules.*'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+      
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': data['data']};
+      } else {
+        return {
+          'success': false, 
+          'message': data['errors']?[0]?['message'] ?? 'Failed to fetch course details'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turo/providers/course_provider.dart';
 
 class TutorCard extends StatelessWidget {
   final Map<String, dynamic> tutor;
@@ -12,6 +14,8 @@ class TutorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final courseProvider = Provider.of<CourseProvider>(context);
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       child: Column(
@@ -22,11 +26,13 @@ class TutorCard extends StatelessWidget {
               // Tutor Avatar
               CircleAvatar(
                 radius: 30,
-                backgroundImage: AssetImage(tutor['image']),
+                backgroundImage: tutor['image'] != null && tutor['image'].toString().isNotEmpty
+                    ? NetworkImage(courseProvider.getAssetUrl(tutor['image']))
+                    : null,
                 backgroundColor: Colors.grey.shade300,
-                child: tutor['image'].startsWith('assets/')
-                    ? null
-                    : Icon(Icons.person, size: 30, color: Colors.grey.shade700),
+                child: (tutor['image'] == null || tutor['image'].toString().isEmpty)
+                    ? Icon(Icons.person, size: 30, color: Colors.grey.shade700)
+                    : null,
               ),
               const SizedBox(width: 15),
 
@@ -45,7 +51,7 @@ class TutorCard extends StatelessWidget {
 
                     // Bio
                     Text(
-                      tutor['bio'],
+                      tutor['bio'] ?? 'No bio available',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Colors.black87,
@@ -111,7 +117,7 @@ class TutorCard extends StatelessWidget {
           ),
         ),
         Text(
-          tutor['price'],
+          tutor['hour_rate'] != null ? '₱${tutor['hour_rate']}/hr' : 'Free',
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
@@ -129,21 +135,23 @@ class TutorCard extends StatelessWidget {
       runSpacing: 5,
       children: [
         // Subject Tags
-        ...List.generate(
-          tutor['tags'].length,
-              (i) => _buildTag(
-            text: tutor['tags'][i],
+        if (tutor['expertise'] != null && tutor['expertise'] is List)
+          ...List.generate(
+            (tutor['expertise'] as List).length,
+            (i) => _buildTag(
+              text: (tutor['expertise'] as List)[i],
+              backgroundColor: const Color(0xFFD8F2F6),
+              textColor: const Color(0xFF3F8E9B),
+            ),
+          ),
+
+        // Education background as experience tag
+        if (tutor['education_background'] != null && tutor['education_background'].toString().isNotEmpty)
+          _buildTag(
+            text: tutor['education_background'],
             backgroundColor: const Color(0xFFD8F2F6),
             textColor: const Color(0xFF3F8E9B),
           ),
-        ),
-
-        // Experience Tag
-        _buildTag(
-          text: tutor['experience'],
-          backgroundColor: const Color(0xFFD8F2F6),
-          textColor: const Color(0xFF3F8E9B),
-        ),
 
         // Rating Tag
         Container(

@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../Widgets/module_card.dart';
 import '../../Widgets/navbar.dart';
 import '../../Widgets/filter_dialog.dart';
 import '../../Widgets/tutor_card.dart';
 import '../../Widgets/course_card.dart';
+import 'course_detail_screen.dart';
+import 'instructor_detail_screen.dart';
+import 'student_homepage.dart' as homepage;
+import 'package:turo/providers/course_provider.dart';
 
 class Search extends StatefulWidget {
   const Search({super.key});
@@ -29,103 +34,19 @@ class _SearchState extends State<Search> {
     NavBarItem(icon: Icons.person_outline, label: 'Profile'),
   ];
 
-  // Dummy data for list of tutors
-  final List<Map<String, dynamic>> _tutors = [
-    {
-      'name': 'Joshua Garcia',
-      'image': 'assets/joshua.png',
-      'verified': true,
-      'price': '₱100/hr',
-      'priceValue': 100,
-      'tags': ['English', 'Filipino'],
-      'experience': '2+',
-      'rating': 4.8,
-      'bio': 'A dedicated college student with a passion for language and education. Currently pursuing a degree in Psychology at Manu...',
-    },
-    {
-      'name': 'Donny Pangilinan',
-      'image': 'assets/joshua.png',
-      'verified': true,
-      'price': '₱100/hr',
-      'priceValue': 100,
-      'tags': ['Math', 'Programming'],
-      'experience': '2+',
-      'rating': 4.8,
-      'bio': 'I\'m Juan De La Cruz, a passionate IT student with a deep fascination for computers and technology. Currently wor...',
-    },
-    {
-      'name': 'Andres Muhlach',
-      'image': 'assets/joshua.png',
-      'verified': true,
-      'price': '₱200/hr',
-      'priceValue': 200,
-      'tags': ['Math', 'Programming'],
-      'experience': '2+',
-      'rating': 4.8,
-      'bio': 'I\'m Juan De La Cruz, a passionate IT student with a deep fascination for computers and technology. Currently wor...',
-    },
-    {
-      'name': 'Brent Manalo',
-      'image': 'assets/joshua.png',
-      'verified': true,
-      'price': '₱150/hr',
-      'priceValue': 150,
-      'tags': ['English', 'Programming'],
-      'experience': '2+',
-      'rating': 4.8,
-      'bio': 'I\'m Juan De La Cruz, a multi-passionate CS student with a deep fascination for computers and technology. Currently wor...',
-    },
-  ];
+  // Get instructors from provider
+  List<Map<String, dynamic>> get _tutors {
+    final courseProvider = Provider.of<CourseProvider>(context, listen: false);
+    return courseProvider.instructors;
+  }
 
-  // Dummy data for list of courses
-  final List<Map<String, dynamic>> _courses = [
-    {
-      'title': 'Introduction to Python',
-      'image': 'assets/courses/python.png',
-      'schedule': '1hr/day',
-      'instructor': 'Mr. Catalla',
-      'description': 'An engaging beginner-friendly course that introduces the fundamentals of Python...',
-      'tags': ['Programming', 'Computer Science'],
-      'rating': 4.7,
-    },
-    {
-      'title': 'Conversational English',
-      'image': 'assets/courses/python.png',
-      'schedule': '1hr/day',
-      'instructor': 'Mr. Echevaria',
-      'description': 'A practical course designed to build confidence and fluency in conversational...',
-      'tags': ['English', 'Language'],
-      'rating': 4.9,
-    },
-    {
-      'title': 'Foundational Algebra',
-      'image': 'assets/courses/python.png',
-      'schedule': '1hr/day',
-      'instructor': 'Ms. Oriola',
-      'description': 'A foundational course that explores the core principles of algebra, including solving...',
-      'tags': ['Math', 'Algebra'],
-      'rating': 4.6,
-    },
-    {
-      'title': 'Basic Chemistry',
-      'image': 'assets/courses/python.png',
-      'schedule': '1hr/day',
-      'instructor': 'Ms. Erika',
-      'description': 'A practical course designed to build confidence and fluency in understanding and applying chemistry...',
-      'tags': ['Science', 'Chemistry'],
-      'rating': 4.8,
-    },
-    {
-      'title': 'Journalism',
-      'image': 'assets/courses/python.png',
-      'schedule': '1hr/day',
-      'instructor': 'Mr. Santos',
-      'description': 'Learn the fundamentals of journalism and develop essential writing and reporting skills...',
-      'tags': ['Journalism', 'Writing'],
-      'rating': 4.5,
-    },
-  ];
+  // Get courses from provider
+  List<Map<String, dynamic>> get _courses {
+    final courseProvider = Provider.of<CourseProvider>(context, listen: false);
+    return courseProvider.courses;
+  }
 
+  // Dummy data for modules (keeping this as is)
   final List<Map<String, dynamic>> _modules = [
     {
       'title': 'Basics of Journalism',
@@ -223,8 +144,11 @@ class _SearchState extends State<Search> {
             filters['categories'] is List &&
             (filters['categories'] as List).isNotEmpty) {
           _filteredTutors = _filteredTutors.where((tutor) {
-            return tutor['tags'].any((tag) =>
-                (filters['categories'] as List).contains(tag));
+            if (tutor['expertise'] == null || !(tutor['expertise'] is List)) {
+              return false;
+            }
+            return (tutor['expertise'] as List).any((expertise) =>
+                (filters['categories'] as List).contains(expertise));
           }).toList();
         }
 
@@ -234,7 +158,9 @@ class _SearchState extends State<Search> {
           int maxPrice = filters['priceRange']['max'] as int;
 
           _filteredTutors = _filteredTutors.where((tutor) {
-            int price = tutor['priceValue'] as int;
+            var hourRate = tutor['hour_rate'];
+            // Handle null or non-numeric hour_rate
+            int price = (hourRate is num) ? hourRate.toInt() : 0;
             return price >= minPrice && price <= maxPrice;
           }).toList();
         }
@@ -244,8 +170,10 @@ class _SearchState extends State<Search> {
           int minRating = filters['rating'] as int;
 
           _filteredTutors = _filteredTutors.where((tutor) {
-            double rating = tutor['rating'] as double;
-            return rating >= minRating;
+            var rating = tutor['rating'];
+            // Handle if rating is null or not a number
+            double ratingValue = (rating is num) ? rating.toDouble() : 0.0;
+            return ratingValue >= minRating;
           }).toList();
         }
 
@@ -260,7 +188,10 @@ class _SearchState extends State<Search> {
             filters['categories'] is List &&
             (filters['categories'] as List).isNotEmpty) {
           _filteredCourses = _filteredCourses.where((course) {
-            return course['tags'].any((tag) =>
+            if (course['tags'] == null || !(course['tags'] is List)) {
+              return false;
+            }
+            return (course['tags'] as List).any((tag) =>
                 (filters['categories'] as List).contains(tag));
           }).toList();
         }
@@ -270,8 +201,9 @@ class _SearchState extends State<Search> {
           int minRating = filters['rating'] as int;
 
           _filteredCourses = _filteredCourses.where((course) {
-            double rating = course['rating'] as double;
-            return rating >= minRating;
+            var rating = course['rating'];
+            double ratingValue = (rating is num) ? rating.toDouble() : 0.0;
+            return ratingValue >= minRating;
           }).toList();
         }
 
@@ -288,7 +220,10 @@ class _SearchState extends State<Search> {
             filters['categories'] is List &&
             (filters['categories'] as List).isNotEmpty) {
           _filteredModules = _filteredModules.where((module) {
-            return module['tags'].any((tag) =>
+            if (module['tags'] == null || !(module['tags'] is List)) {
+              return false;
+            }
+            return (module['tags'] as List).any((tag) =>
                 (filters['categories'] as List).contains(tag));
           }).toList();
         }
@@ -299,8 +234,9 @@ class _SearchState extends State<Search> {
           int maxPrice = filters['priceRange']['max'] as int;
 
           _filteredModules = _filteredModules.where((module) {
-            int price = module['priceValue'] as int;
-            return price >= minPrice && price <= maxPrice;
+            var price = module['priceValue'];
+            int priceValue = (price is num) ? price.toInt() : 0;
+            return priceValue >= minPrice && priceValue <= maxPrice;
           }).toList();
         }
 
@@ -309,8 +245,9 @@ class _SearchState extends State<Search> {
           int minRating = filters['rating'] as int;
 
           _filteredModules = _filteredModules.where((module) {
-            double rating = module['rating'] as double;
-            return rating >= minRating;
+            var rating = module['rating'];
+            double ratingValue = (rating is num) ? rating.toDouble() : 0.0;
+            return ratingValue >= minRating;
           }).toList();
         }
 
@@ -353,14 +290,36 @@ class _SearchState extends State<Search> {
 
   // Navigate to tutor profile
   void _navigateToTutorProfile(Map<String, dynamic> tutor) {
-    // Implement navigation to tutor profile
-    print('Navigate to profile for: ${tutor['name']}');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => InstructorDetailScreen(instructor: tutor),
+      ),
+    );
   }
 
   // Navigate to course details
   void _navigateToCourseDetails(Map<String, dynamic> course) {
-    // Implement navigation to course details
-    print('Navigate to course: ${course['title']}');
+    // Get instructor from course
+    int instructorId = 0; // Default to first instructor
+    if (course['instructorId'] is int) {
+      instructorId = course['instructorId'];
+    }
+    
+    final instructors = _tutors;
+    final instructor = instructorId < instructors.length
+        ? instructors[instructorId]
+        : {'name': 'Unknown Instructor'};
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CourseDetailScreen(
+          course: course,
+          instructor: instructor,
+        ),
+      ),
+    );
   }
 
   void _navigateToModuleDetails(Map<String, dynamic> module) {
@@ -474,10 +433,14 @@ class _SearchState extends State<Search> {
                                             _activeFilters['categories'] is List &&
                                             (_activeFilters['categories'] as List)
                                                 .isNotEmpty) {
-                                          matchesFilters =
-                                              tutor['tags'].any((tag) =>
+                                          if (tutor['expertise'] == null || !(tutor['expertise'] is List)) {
+                                            matchesFilters = false;
+                                          } else {
+                                            matchesFilters =
+                                                (tutor['expertise'] as List).any((expertise) =>
                                                   (_activeFilters['categories'] as List)
-                                                      .contains(tag));
+                                                      .contains(expertise));
+                                          }
                                         }
 
                                         // Apply price filter if active
@@ -487,7 +450,8 @@ class _SearchState extends State<Search> {
                                             _activeFilters['priceRange'] is Map) {
                                           int minPrice = _activeFilters['priceRange']['min'] as int;
                                           int maxPrice = _activeFilters['priceRange']['max'] as int;
-                                          int price = tutor['priceValue'] as int;
+                                          var hourRate = tutor['hour_rate'];
+                                          int price = (hourRate is num) ? hourRate.toInt() : 0;
                                           matchesFilters = price >= minPrice &&
                                               price <= maxPrice;
                                         }
@@ -497,7 +461,9 @@ class _SearchState extends State<Search> {
                                             _activeFilters.containsKey(
                                                 'rating') &&
                                             _activeFilters['rating'] is int) {
-                                          matchesFilters = tutor['rating'] >=
+                                          var rating = tutor['rating'];
+                                          double ratingValue = (rating is num) ? rating.toDouble() : 0.0;
+                                          matchesFilters = ratingValue >=
                                               _activeFilters['rating'];
                                         }
 
