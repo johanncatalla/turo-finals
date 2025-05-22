@@ -1,15 +1,19 @@
-// lib/Widgets/filter_dialog.dart - Updated to show price range for both Tutors and Modules
+// lib/Widgets/filter_dialog.dart - Updated for dynamic subject categories
 
 import 'package:flutter/material.dart';
 
 class FilterDialog extends StatefulWidget {
-  final Function(Map<String, dynamic>) onApplyFilter;
-  final int initialMode;
+  final Function(Map<String, dynamic>) onApplyFilters;
+  final int mode;
+  final Map<String, dynamic> activeFilters;
+  final List<String> categoryOptions;
 
   const FilterDialog({
     Key? key,
-    required this.onApplyFilter,
-    this.initialMode = 0,
+    required this.onApplyFilters,
+    required this.mode,
+    required this.activeFilters,
+    required this.categoryOptions,
   }) : super(key: key);
 
   @override
@@ -21,7 +25,7 @@ class _FilterDialogState extends State<FilterDialog> {
   late int _selectedMode;
 
   // Selected categories
-  final List<String> _selectedCategories = [];
+  late List<String> _selectedCategories;
 
   // Price range
   double _minPrice = 0;
@@ -33,15 +37,22 @@ class _FilterDialogState extends State<FilterDialog> {
   // Available filter types
   final List<String> _filterTypes = ['Tutors', 'Courses', 'Modules'];
 
-  // Available categories
-  final List<String> _categories = [
-    'Math', 'English', 'Science', 'Filipino', 'Programming', 'Journalism'
-  ];
-
   @override
   void initState() {
     super.initState();
-    _selectedMode = widget.initialMode;
+    _selectedMode = widget.mode;
+    
+    // Initialize filters from active filters
+    _selectedCategories = List<String>.from(
+      widget.activeFilters['categories'] ?? []
+    );
+    
+    if (widget.activeFilters.containsKey('priceRange')) {
+      _minPrice = (widget.activeFilters['priceRange']['min'] ?? 0).toDouble();
+      _maxPrice = (widget.activeFilters['priceRange']['max'] ?? 500).toDouble();
+    }
+    
+    _selectedRating = widget.activeFilters['rating'] ?? 4;
   }
 
   @override
@@ -128,6 +139,8 @@ class _FilterDialogState extends State<FilterDialog> {
                       onPressed: () {
                         setState(() {
                           _selectedMode = index;
+                          // Clear selected categories when changing mode
+                          _selectedCategories.clear();
                         });
                       },
                       style: ElevatedButton.styleFrom(
@@ -167,7 +180,7 @@ class _FilterDialogState extends State<FilterDialog> {
             Wrap(
               spacing: 10,
               runSpacing: 10,
-              children: _categories.map((category) {
+              children: widget.categoryOptions.map((category) {
                 bool isSelected = _selectedCategories.contains(category);
                 return ElevatedButton(
                   onPressed: () {
@@ -198,35 +211,11 @@ class _FilterDialogState extends State<FilterDialog> {
                     ),
                   ),
                 );
-              }).toList()..add(
-                ElevatedButton(
-                  onPressed: () {
-                    // Implement "More" functionality if needed
-                  },
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.grey,
-                    backgroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
-                    side: BorderSide(
-                      color: Colors.grey.shade300,
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  ),
-                  child: const Text(
-                    'More +',
-                    style: TextStyle(
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
+              }).toList(),
             ),
             const SizedBox(height: 24),
 
-            // Price Range - Show for Tutors and Modules, but not Courses
+            // Price Range (only for tutors and modules)
             if (_selectedMode == 0 || _selectedMode == 2) ...[
               const Text(
                 'Price Range',
@@ -242,12 +231,15 @@ class _FilterDialogState extends State<FilterDialog> {
                   activeTrackColor: const Color(0xFF4DA6A6),
                   inactiveTrackColor: Colors.grey.shade300,
                   trackHeight: 4,
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                  rangeThumbShape: const RoundRangeSliderThumbShape(
+                    enabledThumbRadius: 8,
+                  ),
                 ),
                 child: RangeSlider(
                   values: RangeValues(_minPrice, _maxPrice),
                   min: 0,
-                  max: 500,
+                  max: 1000,
+                  divisions: 20,
                   onChanged: (RangeValues values) {
                     setState(() {
                       _minPrice = values.start;
@@ -307,7 +299,7 @@ class _FilterDialogState extends State<FilterDialog> {
             Row(
               children: List.generate(
                 5,
-                    (index) => IconButton(
+                (index) => IconButton(
                   icon: Icon(
                     Icons.star,
                     color: index < _selectedRating
@@ -333,8 +325,8 @@ class _FilterDialogState extends State<FilterDialog> {
                     onPressed: () {
                       setState(() {
                         _selectedCategories.clear();
-                        _minPrice = 98;
-                        _maxPrice = 308;
+                        _minPrice = 0;
+                        _maxPrice = 500;
                         _selectedRating = 4;
                       });
                     },
@@ -360,17 +352,20 @@ class _FilterDialogState extends State<FilterDialog> {
                     onPressed: () {
                       // Create filter parameters
                       final Map<String, dynamic> filterParams = {
-                        'mode': _selectedMode,
                         'categories': _selectedCategories,
-                        'priceRange': {
-                          'min': _minPrice.toInt(),
-                          'max': _maxPrice.toInt(),
-                        },
                         'rating': _selectedRating,
                       };
+                      
+                      // Add price range only for tutors and modules
+                      if (_selectedMode == 0 || _selectedMode == 2) {
+                        filterParams['priceRange'] = {
+                          'min': _minPrice.toInt(),
+                          'max': _maxPrice.toInt(),
+                        };
+                      }
 
                       // Call the callback function
-                      widget.onApplyFilter(filterParams);
+                      widget.onApplyFilters(filterParams);
 
                       // Close the dialog
                       Navigator.pop(context);

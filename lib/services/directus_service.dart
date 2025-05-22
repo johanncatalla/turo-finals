@@ -556,4 +556,41 @@ class DirectusService {
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
+  
+  // Fetch all subjects
+  Future<Map<String, dynamic>> getSubjects() async {
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+      
+      print('Fetching subjects from Directus...');
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/items/Subjects?fields=*'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+      
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200) {
+        print('Successfully fetched ${data['data']?.length ?? 0} subjects');
+        return {'success': true, 'data': data['data']};
+      } else {
+        print('Error fetching subjects: ${data['errors'] != null ? data['errors'][0]['message'] : 'Unknown error'}');
+        return {
+          'success': false, 
+          'message': data['errors']?[0]?['message'] ?? 'Failed to fetch subjects'
+        };
+      }
+    } catch (e) {
+      print('Network error fetching subjects: ${e.toString()}');
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
 }
