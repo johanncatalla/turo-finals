@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:image_picker/image_picker.dart'; // << NEW: Import image_picker
+import 'dart:io'; // << NEW: Import for File operations
 
 import '../../services/directus_service.dart';
 
@@ -17,7 +20,7 @@ class CreateCourseScreen extends StatefulWidget {
 class _CreateCourseScreenState extends State<CreateCourseScreen>
     with SingleTickerProviderStateMixin {
   final DirectusService _directusService = DirectusService();
-  String? _currentTutorProfileId; // << RENAMED
+  String? _currentTutorProfileId;
   bool _isLoading = false;
 
   final TextEditingController _titleController = TextEditingController();
@@ -29,6 +32,11 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   late TabController _tabController;
   DateTime _calendarFocusedDay = DateTime.now();
   DateTime? _calendarSelectedDay;
+
+  // --- NEW: For Image Upload ---
+  XFile? _courseImageFile;
+  final ImagePicker _picker = ImagePicker();
+  // --- END NEW ---
 
   final Map<String, String> _dayMapping = {
     'Mo': 'Monday',
@@ -48,13 +56,13 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   Future<void> _fetchCurrentTutorProfileId() async {
+    // ... (your existing _fetchCurrentTutorProfileId method - no changes needed here)
     final response = await _directusService.fetchTutorProfile();
     if (mounted) {
       if (response['success'] == true && response['data'] != null) {
         final userData = response['data'];
         final tutorProfileData = userData['tutor_profile'][0];
 
-        // The `fetchTutorProfile` service method aims to resolve `tutor_profile` to a Map
         if (tutorProfileData != null && tutorProfileData is Map) {
           if (tutorProfileData['id'] != null) {
             setState(() {
@@ -69,7 +77,6 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
             );
           }
         } else {
-          // This covers null tutor_profile or if it wasn't resolved as expected
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
                 content: Text('No tutor profile found for this user or it could not be resolved. Please ensure a tutor profile exists and is linked.'),
@@ -95,7 +102,40 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
     super.dispose();
   }
 
+  // --- NEW: Image Picker Method ---
+  Future<void> _pickCourseImage() async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery, // Or ImageSource.camera
+        imageQuality: 70, // Optional: to reduce file size
+        maxWidth: 1024,   // Optional: to resize image
+        maxHeight: 1024,  // Optional: to resize image
+      );
+      if (pickedFile != null) {
+        setState(() {
+          _courseImageFile = pickedFile;
+        });
+      } else {
+        // User canceled the picker
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No image selected.')),
+          );
+        }
+      }
+    } catch (e) {
+      print("Error picking image: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: $e')),
+        );
+      }
+    }
+  }
+  // --- END NEW ---
+
   String _formatTimeOfDayForDisplay(TimeOfDay? tod) {
+    // ... (your existing method)
     if (tod == null) return '00:00';
     final now = DateTime.now();
     final dt = DateTime(now.year, now.month, now.day, tod.hour, tod.minute);
@@ -104,6 +144,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   String _formatTimeOfDayForApi(TimeOfDay? tod) {
+    // ... (your existing method)
     if (tod == null) return '00:00:00';
     final hour = tod.hour.toString().padLeft(2, '0');
     final minute = tod.minute.toString().padLeft(2, '0');
@@ -111,11 +152,13 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   String _formatDateForApi(DateTime? date) {
+    // ... (your existing method)
     if (date == null) return '';
     return DateFormat('yyyy-MM-dd').format(date);
   }
 
   String _getDayNameFromWeekday(int weekday) {
+    // ... (your existing method)
     switch (weekday) {
       case DateTime.monday: return 'Monday';
       case DateTime.tuesday: return 'Tuesday';
@@ -129,6 +172,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   Future<void> _selectTime(BuildContext context, bool isStartTime) async {
+    // ... (your existing method - no changes needed here)
     final TimeOfDay initialTime = isStartTime
         ? (_startTime ?? TimeOfDay.now())
         : (_endTime ?? _startTime ?? TimeOfDay.now());
@@ -200,32 +244,59 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
       );
       return;
     }
-    // Ensure times are selected before proceeding
     if (_startTime == null || _endTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select start and end times for availability.'), backgroundColor: Colors.orange),
       );
-      setState(() { _isLoading = false; }); // Reset loading if validation fails
       return;
     }
-    // Ensure at least one form of availability is selected
     if (_selectedDays.isEmpty && _calendarSelectedDay == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select at least one recurring day or a specific date for availability.'), backgroundColor: Colors.orange),
       );
-      setState(() { _isLoading = false; }); // Reset loading
       return;
     }
 
-
     setState(() { _isLoading = true; });
 
-    // 1. Create the Course
+    String? uploadedCourseImageId; // << MODIFIED: To store the uploaded image ID
+
+    // --- MODIFIED: Step 1. Upload the course_image ---
+    if (_courseImageFile != null) {
+      final imageUploadResponse = await _directusService.uploadFile(_courseImageFile!);
+      if (imageUploadResponse['success'] == true && imageUploadResponse['data'] != null) {
+        uploadedCourseImageId = imageUploadResponse['data']['id']?.toString();
+        if (uploadedCourseImageId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to get ID from uploaded course image.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() { _isLoading = false; });
+          return;
+        }
+        print("Uploaded Course Image ID: $uploadedCourseImageId");
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to upload course image: ${imageUploadResponse['message'] ?? 'Unknown error'}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() { _isLoading = false; });
+        return; // Stop if image upload fails
+      }
+    }
+    // --- END MODIFIED ---
+
+    // 2. Create the Course
     final courseResponse = await _directusService.createCourse(
       title: courseTitle,
       description: courseDescription,
       subjectId: subjectId,
       tutorId: _currentTutorProfileId!,
+      courseImageId: uploadedCourseImageId, // << MODIFIED: Pass the image ID
     );
 
     if (courseResponse['success'] != true) {
@@ -248,21 +319,20 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
     bool allAvailabilityCreated = true;
     List<String> availabilityErrors = [];
 
-    // Handle recurring availability (if days are selected)
     if (_selectedDays.isNotEmpty) {
       List<String> recurringDaysList = _selectedDays
           .map((shortDay) => _dayMapping[shortDay] ?? '')
-          .where((day) => day.isNotEmpty) // Filter out any empty strings if mapping failed
+          .where((day) => day.isNotEmpty)
           .toList();
 
-      if (recurringDaysList.isNotEmpty) { // Proceed only if there are valid day names
+      if (recurringDaysList.isNotEmpty) {
         final availabilityResponse = await _directusService.createTutorAvailability(
           tutorId: _currentTutorProfileId!,
-          daysOfWeek: recurringDaysList, // Pass the list of full day names
+          daysOfWeek: recurringDaysList,
           startTime: _formatTimeOfDayForApi(_startTime!),
           endTime: _formatTimeOfDayForApi(_endTime!),
           recurring: true,
-          specificDate: null, // Not a specific single date
+          specificDate: null,
         );
         if (availabilityResponse['success'] != true) {
           allAvailabilityCreated = false;
@@ -271,15 +341,14 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
       }
     }
 
-    // Handle specific date availability (if a calendar day is selected)
     if (_calendarSelectedDay != null) {
       final String dayNameForSpecificDate = _getDayNameFromWeekday(_calendarSelectedDay!.weekday);
       final availabilityResponse = await _directusService.createTutorAvailability(
         tutorId: _currentTutorProfileId!,
-        daysOfWeek: [dayNameForSpecificDate], // API expects a list, so wrap the single day name
+        daysOfWeek: [dayNameForSpecificDate],
         startTime: _formatTimeOfDayForApi(_startTime!),
         endTime: _formatTimeOfDayForApi(_endTime!),
-        recurring: false, // This is a non-recurring, specific date
+        recurring: false,
         specificDate: _formatDateForApi(_calendarSelectedDay!),
       );
       if (availabilityResponse['success'] != true) {
@@ -296,7 +365,17 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
             content: Text('All tutor availability slots created successfully!'),
             backgroundColor: Colors.green),
       );
-      // Optionally clear form or navigate
+      // Optionally clear form or navigate:
+      // _titleController.clear();
+      // _descriptionController.clear();
+      // setState(() {
+      //   _courseImageFile = null;
+      //   _selectedDays.clear();
+      //   _startTime = null;
+      //   _endTime = null;
+      //   _calendarSelectedDay = null;
+      // });
+      // Navigator.of(context).pop();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -309,9 +388,67 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
 
+  // --- UI Widgets ---
 
-  // --- UI Widgets (no changes below this line, assuming they are fine) ---
+  // --- NEW: Widget for Image Picker and Preview ---
+  Widget _buildCourseImagePicker() {
+    return GestureDetector(
+      onTap: _pickCourseImage,
+      child: Container(
+        height: 200,
+        width: double.infinity,
+        margin: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(12.0),
+          border: Border.all(color: Colors.grey[350]!, width: 1.5),
+        ),
+        child: _courseImageFile == null
+            ? Column( // Placeholder UI when no image is selected
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_upload_rounded, size: 60, color: Colors.grey[500]),
+            const SizedBox(height: 16),
+            Text(
+              'Tap to upload course image',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Preview will appear here (e.g., 16:9)',
+              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+            ),
+          ],
+        )
+            : ClipRRect( // Display the selected image
+          borderRadius: BorderRadius.circular(10.5), // Slightly less than container radius for better look
+          child: kIsWeb // <<<< MODIFICATION START >>>>
+              ? Image.network( // Use Image.network for web
+            _courseImageFile!.path,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            // Optional: Add errorBuilder for web network image
+            errorBuilder: (context, error, stackTrace) {
+              print("Error loading web image: $error");
+              return const Center(child: Text("Couldn't display image"));
+            },
+          )
+              : Image.file( // Use Image.file for mobile/desktop
+            File(_courseImageFile!.path),
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+          ), // <<<< MODIFICATION END >>>>
+        ),
+      ),
+    );
+  }
+  // --- END NEW ---
+
+
   Widget _buildDayToggle(String day) {
+    // ... (your existing method)
     final isSelected = _selectedDays.contains(day);
     return GestureDetector(
       onTap: () {
@@ -341,6 +478,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   Widget _buildClassSchedule() {
+    // ... (your existing method)
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Column(
@@ -430,6 +568,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   Widget _buildLecturerTabContent() {
+    // ... (your existing method)
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 8.0),
       child: Row(
@@ -459,6 +598,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   Widget _buildMaterialsTabContent() {
+    // ... (your existing method)
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24.0),
       child: Container(
@@ -501,6 +641,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   Widget _buildCalendarSection() {
+    // ... (your existing method)
     return Column(
       children: [
         Container(
@@ -588,6 +729,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
 
     return Scaffold(
       appBar: AppBar(
+        // ... (your existing AppBar)
         backgroundColor: Colors.white,
         elevation: 1,
         leading: IconButton(
@@ -610,22 +752,9 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 200,
-              width: double.infinity,
-              color: Colors.grey[200],
-              margin: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.cloud_upload_rounded, size: 60, color: Colors.grey[500]),
-                  const SizedBox(height: 16),
-                  Text('Drag and drop or click here', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey[700])),
-                  const SizedBox(height: 4),
-                  Text('to upload your course image preview', style: TextStyle(fontSize: 14, color: Colors.grey[500])),
-                ],
-              ),
-            ),
+            // --- MODIFIED: Use the new image picker widget ---
+            _buildCourseImagePicker(),
+            // --- END MODIFIED ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
@@ -741,11 +870,12 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: _buildCalendarSection(),
             ),
-            const SizedBox(height: 120),
+            const SizedBox(height: 120), // Space for bottom sheet
           ],
         ),
       ),
       bottomSheet: Padding(
+        // ... (your existing bottomSheet - no changes needed here, already handles _isLoading)
         padding: const EdgeInsets.all(16.0),
         child: SizedBox(
           width: double.infinity,
@@ -758,7 +888,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
               ),
               elevation: 5,
             ),
-            onPressed: (_isLoading || _currentTutorProfileId == null) // Disable if loading or no tutor profile ID
+            onPressed: (_isLoading || _currentTutorProfileId == null)
                 ? null
                 : _handleSaveCourseAndAvailability,
             child: _isLoading

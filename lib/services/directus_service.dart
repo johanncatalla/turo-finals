@@ -904,6 +904,7 @@ class DirectusService {
     required String description,
     required String subjectId, // ID of the related subject item
     required String tutorId,   // ID of the user (e.g., from directus_users) who is the tutor
+    required String? courseImageId,
   }) async {
     if (baseUrl == null) {
       return {'success': false, 'message': 'API base URL is not configured.'};
@@ -927,6 +928,7 @@ class DirectusService {
           'description': description,
           'subject_id': subjectId, // This should be the ID (PK) of an item in the "subjects" collection
           'tutor_id': tutorId,     // This should be the ID (PK) of an item in the "users" or "tutors" collection
+          'course_image': courseImageId,
         }),
       );
 
