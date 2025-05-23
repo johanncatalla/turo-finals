@@ -380,7 +380,6 @@ class DirectusService {
       // Send the request
       print('Sending file upload request');
       var streamedResponse = await request.send();
-      // print('Response status: ${streamedResponse.statusCode}');
       var response = await http.Response.fromStream(streamedResponse);
       
       if (response.statusCode == 200) {
@@ -443,8 +442,6 @@ class DirectusService {
 
       print('Fetching tutors from Directus...');
 
-      // Fetch users with user_type = Tutor and include their tutor profiles
-      // Make sure to expand the tutor_profile properly since it's an O2M relationship
       final response = await http.get(
         Uri.parse('$baseUrl/users?filter={"user_type":"Tutor"}&fields=*,tutor_profile.*,subjects.*'),
         headers: {
@@ -456,9 +453,6 @@ class DirectusService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        // print('Successfully fetched ${data['data']?.length ?? 0} tutors');
-
-        // Debug first tutor structure
         if (data['data'] is List && data['data'].isNotEmpty) {
           var firstTutor = data['data'][0];
           print('First tutor sample: ${firstTutor['first_name']} ${firstTutor['last_name']}');
@@ -490,9 +484,6 @@ class DirectusService {
       }
 
       print('Fetching courses from Directus...');
-
-      // FIXED: Request courses with properly expanded tutor relationship chain
-      // Courses -> tutor_id -> Tutors -> user_id -> directus_users
       final response = await http.get(
         Uri.parse('$baseUrl/items/Courses?fields=*,subject_id.*,course_image.*,tutor_id.user_id.*'),
         headers: {
@@ -504,14 +495,8 @@ class DirectusService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        // print('Successfully fetched ${data['data']?.length ?? 0} courses');
-
-        // Debug first course structure
         if (data['data'] is List && data['data'].isNotEmpty) {
           var firstCourse = data['data'][0];
-          // print('First course sample: ${firstCourse['title']}');
-
-          // Debug the tutor_id relationship
           if (firstCourse['tutor_id'] != null) {
             print('Course has tutor_id: ${firstCourse['tutor_id'].runtimeType}');
             if (firstCourse['tutor_id'] is Map) {
@@ -526,8 +511,6 @@ class DirectusService {
           } else {
             print('Course has no tutor_id');
           }
-
-          // Debug the junction table data if present
           if (firstCourse['directus_users'] != null) {
             print('Course also has directus_users relationship: ${firstCourse['directus_users'].runtimeType}');
           }
@@ -601,7 +584,6 @@ class DirectusService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        // print('Successfully fetched ${data['data']?.length ?? 0} subjects');
         return {'success': true, 'data': data['data']};
       } else {
         print('Error fetching subjects: ${data['errors'] != null ? data['errors'][0]['message'] : 'Unknown error'}');
@@ -927,8 +909,8 @@ class DirectusService {
   Future<Map<String, dynamic>> createCourse({
     required String title,
     required String description,
-    required String subjectId, // ID of the related subject item
-    required String tutorId,   // ID of the user (e.g., from directus_users) who is the tutor
+    required String subjectId,
+    required String tutorId,
     required String? courseImageId,
   }) async {
     if (baseUrl == null) {
@@ -943,7 +925,7 @@ class DirectusService {
       }
 
       final response = await http.post(
-        Uri.parse('$baseUrl/items/Courses'), // Assuming 'courses' is the collection key
+        Uri.parse('$baseUrl/items/Courses'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $adminToken',
@@ -951,8 +933,8 @@ class DirectusService {
         body: jsonEncode({
           'title': title,
           'description': description,
-          'subject_id': subjectId, // This should be the ID (PK) of an item in the "subjects" collection
-          'tutor_id': tutorId,     // This should be the ID (PK) of an item in the "users" or "tutors" collection
+          'subject_id': subjectId,
+          'tutor_id': tutorId,
           'course_image': courseImageId,
         }),
       );
@@ -998,7 +980,7 @@ class DirectusService {
   // Create a new Tutor Availability slot
   Future<Map<String, dynamic>> createTutorAvailability({
     required String tutorId,
-    required List<String> daysOfWeek, // MODIFIED: Now accepts a List of day names
+    required List<String> daysOfWeek,
     required String startTime,
     required String endTime,
     required bool recurring,
@@ -1028,7 +1010,7 @@ class DirectusService {
       }
 
       final response = await http.post(
-        Uri.parse('$baseUrl/items/TutorAvailability'), // Ensure 'TutorAvailability' is your collection key
+        Uri.parse('$baseUrl/items/TutorAvailability'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $adminToken',
@@ -1179,7 +1161,7 @@ class DirectusService {
       }
 
       final response = await http.patch(
-        Uri.parse('$baseUrl/items/Tutors/$tutorProfileId'), // Or whatever your collection is named
+        Uri.parse('$baseUrl/items/Tutors/$tutorProfileId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $adminToken',
@@ -1206,8 +1188,6 @@ class DirectusService {
     required String title,
     required String description,
     required String subjectId,
-    // tutorId usually doesn't change, but include if it can
-    // required String tutorId,
     required String? courseImageId, // Pass null if image is not changed, or new ID if changed
   }) async {
     if (baseUrl == null) {
@@ -1224,29 +1204,19 @@ class DirectusService {
         'title': title,
         'description': description,
         'subject_id': subjectId,
-        // 'tutor_id': tutorId, // Uncomment if tutor can be changed
       };
-
-      // Only include course_image in payload if it's being updated or set
-      // If courseImageId is null, it means we might be unsetting it or not changing it.
-      // If you want "not changing it" to mean "keep the existing one",
-      // then Directus PATCH will do that by default if you don't send the key.
-      // If you want to explicitly set it to null (remove image), send 'course_image': null.
-      if (courseImageId != null) { // If you have a new image ID
+      if (courseImageId != null) {
         payload['course_image'] = courseImageId;
       } else {
-        // If you want to allow REMOVING an image by passing null explicitly
+        // to allow REMOVING an image by passing null explicitly
         // payload['course_image'] = null;
         // Otherwise, if courseImageId is null and you don't send the key,
         // Directus will leave the existing image untouched.
-        // For this example, we'll assume if courseImageId is null, we don't send the key,
-        // meaning if no new image is selected, the old one stays.
-        // If you want to remove an image, you'd need a separate UI action and pass null here.
       }
 
 
-      final response = await http.patch( // Use PATCH for updates
-        Uri.parse('$baseUrl/items/Courses/$courseId'), // Endpoint for specific course
+      final response = await http.patch(
+        Uri.parse('$baseUrl/items/Courses/$courseId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $adminToken',
@@ -1276,12 +1246,10 @@ class DirectusService {
       }
     } catch (e) {
       print('Error in updateCourse: $e');
-      // ... (your existing error handling for network/format exceptions) ...
       return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
     }
   }
 
-  // Helper to fetch a single course item for editing (if needed)
   Future<Map<String, dynamic>> getCourseDetailsForEdit(String courseId) async {
     try {
       final adminToken = dotenv.env['ADMIN_TOKEN'];
@@ -1289,10 +1257,8 @@ class DirectusService {
         return {'success': false, 'message': 'Admin token not configured'};
       }
 
-      // Fetch course with fields relevant for editing.
-      // Include course_image.id if you want to pre-fill existing image.
       final response = await http.get(
-        Uri.parse('$baseUrl/items/Courses/$courseId?fields=id,title,description,subject_id.id,course_image.id,tutor_id.id'), // Adjust fields as needed
+        Uri.parse('$baseUrl/items/Courses/$courseId?fields=id,title,description,subject_id.id,course_image.id,tutor_id.id'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $adminToken',
@@ -1354,12 +1320,12 @@ class DirectusService {
           'Authorization': 'Bearer $adminToken',
         },
       );
-      
+
       print('📡 Directus API Response Status: ${response.statusCode}');
       print('📡 Directus API Response Body: ${response.body}');
-      
+
       final data = jsonDecode(response.body);
-      
+
       if (response.statusCode == 200) {
         final availabilityData = data['data'] as List? ?? [];
         print('✅ Successfully fetched ${availabilityData.length} availability records from Directus for tutor profile ID: $actualTutorProfileId (original input: $tutorProfileId)');
@@ -1369,7 +1335,7 @@ class DirectusService {
           final record = availabilityData[i];
           print('   📋 Record ${i + 1}: ${record}');
         }
-        
+
         return {'success': true, 'data': availabilityData};
       } else {
         final errorMessage = data['errors']?[0]?['message'] ?? 'Failed to fetch availabilities';
@@ -1394,10 +1360,9 @@ class DirectusService {
         headers: {'Authorization': 'Bearer $adminToken'},
       );
 
-      if (response.statusCode == 204) { // HTTP 204 No Content for successful DELETE
+      if (response.statusCode == 204) {
         return {'success': true, 'message': 'Availability deleted successfully.'};
       } else if (response.statusCode == 200 && response.body.isNotEmpty) {
-        // Sometimes Directus might return 200 with data on delete, handle if necessary
         return {'success': true, 'message': 'Availability deleted (with response).', 'data': jsonDecode(response.body)};
       }
       else {
@@ -1414,7 +1379,6 @@ class DirectusService {
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
-  // Fetch all subjects (alternative to getSubjects or if a different naming is preferred)
   Future<Map<String, dynamic>> fetchSubjects() async {
     // Check if the base URL is configured
     if (baseUrl == null) {
@@ -1430,12 +1394,9 @@ class DirectusService {
         return {'success': false, 'message': 'Admin token not configured'};
       }
 
-      // Optional: Print a debug message
-      // print('Fetching subjects from Directus using fetchSubjects()...');
-
       // Make the HTTP GET request to the 'Subjects' collection endpoint
       final response = await http.get(
-        Uri.parse('$baseUrl/items/Subjects?fields=*'), // Assuming 'Subjects' is your collection key and you want all fields
+        Uri.parse('$baseUrl/items/Subjects?fields=*'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $adminToken', // Use Bearer token for authorization
@@ -1445,23 +1406,17 @@ class DirectusService {
       // Decode the JSON response body
       final responseData = jsonDecode(response.body);
 
-      // Check if the request was successful (HTTP status code 200)
       if (response.statusCode == 200) {
-        // Optional: Print success message with the number of subjects fetched
-        // print('Successfully fetched ${responseData['data']?.length ?? 0} subjects.');
+
         return {'success': true, 'data': responseData['data']};
       } else {
-        // Handle errors based on the response from Directus
         final errorMessage = responseData['errors']?[0]?['message'] ?? 'Failed to fetch subjects';
-        // print('Error fetching subjects: $errorMessage (Status: ${response.statusCode})');
         return {
           'success': false,
           'message': errorMessage,
         };
       }
     } catch (e) {
-      // Handle network errors or other exceptions during the request
-      // print('Network error fetching subjects: ${e.toString()}');
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
@@ -1555,8 +1510,6 @@ class DirectusService {
 
       final studentsData = jsonDecode(studentsResponse.body);
       final junctionItems = studentsData['data'] as List;
-
-      // Process the junction data to get unique students with their course enrollments
       Map<String, Map<String, dynamic>> uniqueStudents = {};
 
       for (var item in junctionItems) {
@@ -1668,10 +1621,6 @@ class DirectusService {
       return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
     }
   }
-
-  // ============================================================================
-  // BOOKING RELATED METHODS
-  // ============================================================================
 
   // Create a new booking
   Future<Map<String, dynamic>> createBooking({
