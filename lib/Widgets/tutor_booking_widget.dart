@@ -94,14 +94,31 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
       
       if (response['success']) {
         final availabilityData = List<Map<String, dynamic>>.from(response['data'] ?? []);
-        print('Loaded ${availabilityData.length} availability records');
+        print('🎯 Loaded ${availabilityData.length} availability records for tutor ${widget.tutorProfileId}:');
         for (int i = 0; i < availabilityData.length; i++) {
-          print('Record $i: ${availabilityData[i]}');
+          final record = availabilityData[i];
+          print('   Record ${i + 1}: ${record['recurring'] == true ? 'Recurring' : 'One-time'}');
+          print('     Days: ${record['day_of_week']} (${record['day_of_week'].runtimeType})');
+          print('     Time: ${record['start_time']} - ${record['end_time']}');
+          if (record['specific_date'] != null) {
+            print('     Specific Date: ${record['specific_date']}');
+          }
+          print('');
         }
         
         setState(() {
           _tutorAvailability = availabilityData;
           _isLoadingAvailability = false;
+        });
+        
+        // Force calendar rebuild by triggering a small state change
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            setState(() {
+              // Small state change to force calendar refresh
+              _focusedDay = _focusedDay;
+            });
+          }
         });
       } else {
         print('Failed to load availability: ${response['message']}');
@@ -125,16 +142,46 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
     final dayName = _getDayName(date.weekday);
     
     for (var availability in _tutorAvailability) {
-      final availableDays = availability['day_of_week'] as List?;
+      final availableDays = availability['day_of_week'];
       final isRecurring = availability['recurring'] == true;
       
       bool isDayAvailable = false;
       
+      // Check recurring availability
       if (isRecurring && availableDays != null) {
-        isDayAvailable = availableDays.contains(dayName);
-      } else if (!isRecurring && availability['specific_date'] != null) {
-        final specificDate = DateTime.parse(availability['specific_date']);
-        isDayAvailable = isSameDay(date, specificDate);
+        // Handle both List and String formats
+        List<String> daysList = [];
+        
+        if (availableDays is List) {
+          daysList = List<String>.from(availableDays);
+        } else if (availableDays is String) {
+          // Handle comma-separated string or JSON array string
+          try {
+            if (availableDays.startsWith('[')) {
+              // JSON array format
+              final decoded = availableDays.replaceAll('[', '').replaceAll(']', '').replaceAll('"', '');
+              daysList = decoded.split(',').map((s) => s.trim()).toList();
+            } else {
+              // Comma-separated format
+              daysList = availableDays.split(',').map((s) => s.trim()).toList();
+            }
+          } catch (e) {
+            print('Error parsing day_of_week string in time slot validation: $e');
+            continue;
+          }
+        }
+        
+        isDayAvailable = daysList.contains(dayName);
+      }
+      
+      // Check specific date availability (independent of recurring check)
+      if (!isRecurring && availability['specific_date'] != null) {
+        try {
+          final specificDate = DateTime.parse(availability['specific_date']);
+          isDayAvailable = isSameDay(date, specificDate);
+        } catch (e) {
+          continue;
+        }
       }
       
       if (isDayAvailable) {
@@ -337,13 +384,11 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
   bool _isDayAvailable(DateTime day) {
     // Basic checks: not in the past
     if (day.isBefore(DateTime.now().subtract(const Duration(days: 1)))) {
-      print('Day ${day.toString()} is in the past');
       return false;
     }
     
     // If still loading, don't enable any days
     if (_isLoadingAvailability) {
-      print('Still loading availability data');
       return false;
     }
     
@@ -362,17 +407,96 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
     }
     
     final dayName = _getDayName(day.weekday);
-    print('Checking availability for $dayName (${day.toString()})');
-    print('Total availability records: ${_tutorAvailability.length}');
+    final dateStr = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
     
-    for (var availability in _tutorAvailability) {
-      print('Checking availability record: ${availability.toString()}');
+    print('\n🔍 CHECKING AVAILABILITY for $dayName ($dateStr)');
+    print('📊 Total availability records: ${_tutorAvailability.length}');
+    
+    // Check ALL availability records for this day - don't return early
+    for (int i = 0; i < _tutorAvailability.length; i++) {
+      final availability = _tutorAvailability[i];
+      print('\n   📋 Record ${i + 1}/${_tutorAvailability.length}:');
+      print('      - Type: ${availability['recurring'] == true ? 'Recurring' : 'One-time'}');
+      print('      - Days: ${availability['day_of_week']} (${availability['day_of_week'].runtimeType})');
+      print('      - Time: ${availability['start_time']} - ${availability['end_time']}');
+      print('      - Specific Date: ${availability['specific_date']}');
       
       final availableDays = availability['day_of_week'];
       final isRecurring = availability['recurring'] == true;
       
-      print('Available days: $availableDays (type: ${availableDays.runtimeType}), Is recurring: $isRecurring');
+      // Check recurring availability
+      if (isRecurring && availableDays != null) {
+        print('      🔄 Checking recurring availability...');
+        
+        // Handle both List and String formats
+        List<String> daysList = [];
+        
+        if (availableDays is List) {
+          daysList = List<String>.from(availableDays);
+          print('         ✓ Parsed as List: $daysList');
+        } else if (availableDays is String) {
+          // Handle comma-separated string or JSON array string
+          try {
+            if (availableDays.startsWith('[')) {
+              // JSON array format
+              final decoded = availableDays.replaceAll('[', '').replaceAll(']', '').replaceAll('"', '');
+              daysList = decoded.split(',').map((s) => s.trim()).toList();
+              print('         ✓ Parsed as JSON array string: $daysList');
+            } else {
+              // Comma-separated format
+              daysList = availableDays.split(',').map((s) => s.trim()).toList();
+              print('         ✓ Parsed as comma-separated string: $daysList');
+            }
+          } catch (e) {
+            print('         ❌ Error parsing day_of_week string: $e');
+            continue;
+          }
+        }
+        
+        print('         🎯 Looking for "$dayName" in: $daysList');
+        if (daysList.contains(dayName)) {
+          print('         ✅ MATCH FOUND! $dayName is available (recurring)');
+          return true; // Found a match, day is available
+        } else {
+          print('         ❌ No match for $dayName in recurring days');
+        }
+      }
       
+      // Check specific date availability (independent of recurring check)
+      if (!isRecurring && availability['specific_date'] != null) {
+        print('      📅 Checking specific date availability...');
+        try {
+          final specificDate = DateTime.parse(availability['specific_date']);
+          final specificDateStr = '${specificDate.year}-${specificDate.month.toString().padLeft(2, '0')}-${specificDate.day.toString().padLeft(2, '0')}';
+          print('         🎯 Comparing $dateStr with $specificDateStr');
+          
+          if (isSameDay(day, specificDate)) {
+            print('         ✅ MATCH FOUND! Date is available (specific date)');
+            return true; // Found a match, day is available
+          } else {
+            print('         ❌ No match for specific date');
+          }
+        } catch (e) {
+          print('         ❌ Error parsing specific_date: $e');
+          continue;
+        }
+      }
+    }
+    
+    print('   🚫 RESULT: $dayName ($dateStr) is NOT available');
+    return false;
+  }
+
+  List<Map<String, TimeOfDay>> _getAvailableTimeSlotsForDay(DateTime day) {
+    final dayName = _getDayName(day.weekday);
+    final availableSlots = <Map<String, TimeOfDay>>[];
+    
+    for (var availability in _tutorAvailability) {
+      final availableDays = availability['day_of_week'];
+      final isRecurring = availability['recurring'] == true;
+      bool isDayAvailable = false;
+      
+      // Check recurring availability
       if (isRecurring && availableDays != null) {
         // Handle both List and String formats
         List<String> daysList = [];
@@ -391,47 +515,16 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
               daysList = availableDays.split(',').map((s) => s.trim()).toList();
             }
           } catch (e) {
-            print('Error parsing day_of_week string: $e');
+            print('Error parsing day_of_week string in time slots: $e');
             continue;
           }
         }
         
-        print('Parsed days list: $daysList');
-        if (daysList.contains(dayName)) {
-          print('✅ Found matching recurring availability for $dayName');
-          return true;
-        }
-      } else if (!isRecurring && availability['specific_date'] != null) {
-        try {
-          final specificDate = DateTime.parse(availability['specific_date']);
-          print('Checking specific date: ${specificDate.toString()} vs ${day.toString()}');
-          if (isSameDay(day, specificDate)) {
-            print('✅ Found matching specific date availability for ${day.toString()}');
-            return true;
-          }
-        } catch (e) {
-          print('Error parsing specific_date: $e');
-          continue;
-        }
+        isDayAvailable = daysList.contains(dayName);
       }
-    }
-    
-    print('❌ No availability found for $dayName');
-    return false;
-  }
-
-  List<Map<String, TimeOfDay>> _getAvailableTimeSlotsForDay(DateTime day) {
-    final dayName = _getDayName(day.weekday);
-    final availableSlots = <Map<String, TimeOfDay>>[];
-    
-    for (var availability in _tutorAvailability) {
-      final availableDays = availability['day_of_week'] as List?;
-      final isRecurring = availability['recurring'] == true;
-      bool isDayAvailable = false;
       
-      if (isRecurring && availableDays != null) {
-        isDayAvailable = availableDays.contains(dayName);
-      } else if (!isRecurring && availability['specific_date'] != null) {
+      // Check specific date availability
+      if (!isRecurring && availability['specific_date'] != null) {
         try {
           final specificDate = DateTime.parse(availability['specific_date']);
           isDayAvailable = isSameDay(day, specificDate);
@@ -440,6 +533,7 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
         }
       }
       
+      // If this availability record matches the day, add the time slot
       if (isDayAvailable) {
         final startTime = _parseTimeFromString(availability['start_time']);
         final endTime = _parseTimeFromString(availability['end_time']);
@@ -637,6 +731,7 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: TableCalendar<String>(
+            key: ValueKey('calendar_${_tutorAvailability.length}_${_isLoadingAvailability}'),
             firstDay: DateTime.now(),
             lastDay: DateTime.now().add(const Duration(days: 90)),
             focusedDay: _focusedDay,
