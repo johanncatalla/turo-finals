@@ -2,14 +2,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:table_calendar/table_calendar.dart'; // << NEW: Import table_calendar
+import 'package:table_calendar/table_calendar.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
-import '../../services/directus_service.dart';
-// import '../Students/student_CourseSectionUI.dart'; // Keep if used, commented out for now
+import '../../services/directus_service.dart'; // Ensure this path is correct
 
-// Define primary color, similar to CreateCourseScreen for consistency
 const Color primaryTeal = Color(0xFF4DB6AC);
 
 class EditCourseScreen extends StatefulWidget {
@@ -26,73 +24,119 @@ class EditCourseScreen extends StatefulWidget {
 
 class _EditCourseScreenState extends State<EditCourseScreen> {
   final DirectusService _directusService = DirectusService();
-  bool _isLoading = true;
+  bool _isLoadingPage = true; // For initial page load (course + subjects)
+  bool _isSaving = false; // For the save button
   String? _errorMessage;
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
 
-  // --- Availability State Variables (from CreateCourseScreen) ---
   final Set<String> _selectedDays = {};
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
   DateTime _calendarFocusedDay = DateTime.now();
   DateTime? _calendarSelectedDay;
 
-  // To store IDs of availabilities loaded for editing
   String? _initialRecurringAvailabilityId;
   String? _initialSpecificDateAvailabilityId;
-  String? _courseTutorProfileId; // Tutor profile ID associated with the course
+  String? _courseTutorProfileId;
 
   final Map<String, String> _dayMapping = {
-    'Mo': 'Monday',
-    'Tu': 'Tuesday',
-    'We': 'Wednesday',
-    'Th': 'Thursday',
-    'Fr': 'Friday',
-    'Sa': 'Saturday',
-    'Su': 'Sunday',
+    'Mo': 'Monday', 'Tu': 'Tuesday', 'We': 'Wednesday', 'Th': 'Thursday',
+    'Fr': 'Friday', 'Sa': 'Saturday', 'Su': 'Sunday',
   };
-  // --- End Availability State Variables ---
 
   XFile? _newCourseImageFile;
   final ImagePicker _picker = ImagePicker();
   String? _existingCourseImageId;
   String? _existingCourseImageUrl;
 
-  String? _selectedSubjectId; // Will be loaded
+  // --- NEW: For Subjects Dropdown ---
+  List<Map<String, dynamic>> _subjectsList = [];
+  String? _selectedSubjectId; // This will be loaded and can be changed
+  bool _isLoadingSubjects = true; // Specific loading for subjects dropdown
+  // --- END NEW ---
 
   @override
   void initState() {
     super.initState();
-    _loadAllCourseData();
+    _loadAllInitialData();
   }
 
-  Future<void> _loadAllCourseData() async {
-    setState(() { _isLoading = true; _errorMessage = null; });
-    // No need to fetch _currentTutorProfileId separately if course has tutor_id
+  Future<void> _loadAllInitialData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingPage = true;
+      _errorMessage = null;
+    });
+
+    // Fetch subjects first or in parallel
+    await _fetchSubjects(); // Wait for subjects to load for the dropdown
+
+    // Then load course details (which might depend on subjects being available for display)
     await _loadCourseDetailsAndAvailabilities();
+
     if (mounted) {
-      setState(() { _isLoading = false; });
+      setState(() {
+        _isLoadingPage = false; // Page is ready once both are done
+      });
     }
   }
 
-  TimeOfDay _parseTimeOfDay(String timeStr) { // "HH:mm:ss"
+  // --- NEW: Method to fetch subjects (similar to CreateCourseScreen) ---
+  Future<void> _fetchSubjects() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingSubjects = true;
+      // _subjectsList.clear(); // No need to clear if fetched once
+      // _selectedSubjectId = null; // Don't reset here, it will be set by _loadCourseDetails
+    });
+
+    final response = await _directusService.fetchSubjects();
+
+    if (!mounted) return;
+
+    if (response['success'] == true && response['data'] != null) {
+      final List<dynamic> fetchedData = response['data'];
+      setState(() {
+        _subjectsList = List<Map<String, dynamic>>.from(fetchedData);
+        // _isLoadingSubjects = false; // Moved to _loadAllInitialData completion
+      });
+      if (_subjectsList.isEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No subjects available to select.'), backgroundColor: Colors.orange),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Failed to fetch subjects: ${response['message'] ?? 'Unknown error'}'),
+              backgroundColor: Colors.red),
+        );
+      }
+    }
+    // Final state update for subjects loading is handled by _loadAllInitialData
+    setState(() { _isLoadingSubjects = false; });
+  }
+  // --- END NEW ---
+
+  TimeOfDay _parseTimeOfDay(String timeStr) {
     try {
       final parts = timeStr.split(':');
       return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
     } catch (e) {
       print("Error parsing time: $timeStr, Error: $e");
-      return TimeOfDay.now(); // Fallback
+      return TimeOfDay.now();
     }
   }
 
-  DateTime _parseDate(String dateStr) { // "yyyy-MM-dd"
+  DateTime _parseDate(String dateStr) {
     try {
       return DateFormat('yyyy-MM-dd').parse(dateStr);
     } catch (e) {
       print("Error parsing date: $dateStr, Error: $e");
-      return DateTime.now(); // Fallback
+      return DateTime.now();
     }
   }
 
@@ -106,6 +150,7 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
   }
 
   Future<void> _loadCourseDetailsAndAvailabilities() async {
+    // setState specific to this part of loading if needed, or rely on _isLoadingPage
     final response = await _directusService.getCourseDetailsForEdit(widget.courseId);
     if (!mounted) return;
 
@@ -114,14 +159,26 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
       _titleController.text = courseData['title'] ?? '';
       _descriptionController.text = courseData['description'] ?? '';
 
+      // --- MODIFIED: Set _selectedSubjectId from course data ---
       if (courseData['subject_id'] != null) {
-        _selectedSubjectId = (courseData['subject_id'] is Map)
-            ? courseData['subject_id']['id']?.toString()
-            : courseData['subject_id']?.toString();
-      } else {
-        _selectedSubjectId = "3"; // Fallback if really needed, but ideally UI shows error
-      }
+        // Directus might return the related item as an object or just its ID
+        if (courseData['subject_id'] is Map) {
+          _selectedSubjectId = courseData['subject_id']['id']?.toString();
+        } else {
+          _selectedSubjectId = courseData['subject_id']?.toString();
+        }
+        // Ensure the loaded subject ID is valid among fetched subjects
+        if (_selectedSubjectId != null && !_subjectsList.any((s) => s['id'].toString() == _selectedSubjectId)) {
+          print("Warning: Course's subject_id ('$_selectedSubjectId') not found in fetched subjects list. It might have been deleted.");
+          // Optionally, nullify _selectedSubjectId or show a specific warning
+          // _selectedSubjectId = null;
+        }
 
+      } else {
+        print("Warning: Course details do not contain a subject_id.");
+        // _selectedSubjectId = null; // or a default/fallback if absolutely necessary
+      }
+      // --- END MODIFIED ---
 
       if (courseData['course_image'] != null && courseData['course_image'] is Map) {
         _existingCourseImageId = courseData['course_image']['id']?.toString();
@@ -130,25 +187,22 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
         }
       }
 
-      // Extract tutor profile ID from course data
       if (courseData['tutor_id'] != null) {
         _courseTutorProfileId = (courseData['tutor_id'] is Map)
             ? courseData['tutor_id']['id']?.toString()
             : courseData['tutor_id']?.toString();
+        if (_courseTutorProfileId != null) {
+          await _loadAvailabilities(_courseTutorProfileId!);
+        } else {
+          print("Course Tutor Profile ID not found, cannot load availabilities.");
+        }
       }
-
-      // Load availabilities if tutor profile ID is found
-      if (_courseTutorProfileId != null) {
-        await _loadAvailabilities(_courseTutorProfileId!);
-      } else {
-        print("Course Tutor Profile ID not found, cannot load availabilities.");
-        // Optionally set an error message or handle UI accordingly
-      }
-
     } else {
       _errorMessage = response['message'] ?? "Failed to load course details.";
     }
+    // No individual setState for isLoading here, handled by _loadAllInitialData
   }
+
 
   Future<void> _loadAvailabilities(String tutorProfileIdForAvailabilities) async {
     final availabilityResponse = await _directusService.fetchTutorAvailabilities(tutorProfileIdForAvailabilities);
@@ -160,7 +214,14 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
     final List<dynamic> availabilities = availabilityResponse['data'];
     bool timeSet = false;
 
-    // Find first recurring availability
+    _initialRecurringAvailabilityId = null;
+    _initialSpecificDateAvailabilityId = null;
+    _selectedDays.clear();
+    _startTime = null;
+    _endTime = null;
+    _calendarSelectedDay = null;
+
+
     final recurringAvail = availabilities.firstWhere(
             (a) => a['recurring'] == true && a['day_of_week'] != null && (a['day_of_week'] as List).isNotEmpty,
         orElse: () => null
@@ -168,7 +229,6 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
     if (recurringAvail != null) {
       _initialRecurringAvailabilityId = recurringAvail['id']?.toString();
       if (recurringAvail['day_of_week'] is List) {
-        _selectedDays.clear();
         for (String fullDayName in recurringAvail['day_of_week']) {
           final shortDay = _getShortDayName(fullDayName);
           if (shortDay.isNotEmpty) _selectedDays.add(shortDay);
@@ -179,7 +239,6 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
       timeSet = true;
     }
 
-    // Find first specific date availability
     final specificAvail = availabilities.firstWhere(
             (a) => a['recurring'] == false && a['specific_date'] != null,
         orElse: () => null
@@ -188,18 +247,14 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
       _initialSpecificDateAvailabilityId = specificAvail['id']?.toString();
       if (specificAvail['specific_date'] != null) {
         _calendarSelectedDay = _parseDate(specificAvail['specific_date']);
-        _calendarFocusedDay = _calendarSelectedDay!; // Focus on the selected day
       }
-      if (!timeSet) { // Only set time if not already set by recurring
+      if (!timeSet) {
         if (specificAvail['start_time'] != null) _startTime = _parseTimeOfDay(specificAvail['start_time']);
         if (specificAvail['end_time'] != null) _endTime = _parseTimeOfDay(specificAvail['end_time']);
       }
     }
-    // Update focused day if a specific day is selected
     if (_calendarSelectedDay != null) {
       _calendarFocusedDay = _calendarSelectedDay!;
-      // Ensure TableCalendar's firstDay allows this selected day
-      // For simplicity, we'll set a wide range for firstDay/lastDay in TableCalendar
     }
   }
 
@@ -217,7 +272,7 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
       if (pickedFile != null && mounted) {
         setState(() {
           _newCourseImageFile = pickedFile;
-          _existingCourseImageUrl = null;
+          _existingCourseImageUrl = null; // Clear existing image URL if new one is picked
         });
       }
     } catch (e) {
@@ -245,11 +300,10 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
           border: Border.all(color: Colors.grey[350]!, width: 1.5),
           image: imagePreview != null
               ? DecorationImage(image: imagePreview, fit: BoxFit.cover,
-            onError: (exception, stackTrace) { // Handle image load error
+            onError: (exception, stackTrace) {
               print("Error loading image for preview: $exception");
               if (mounted) {
                 setState(() {
-                  // Clear the problematic URL to revert to placeholder
                   if (_newCourseImageFile == null) _existingCourseImageUrl = null;
                 });
               }
@@ -271,12 +325,11 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
     );
   }
 
-  // --- Availability Helper Methods (from CreateCourseScreen) ---
   String _formatTimeOfDayForDisplay(TimeOfDay? tod) {
     if (tod == null) return 'Set Time';
     final now = DateTime.now();
     final dt = DateTime(now.year, now.month, now.day, tod.hour, tod.minute);
-    return DateFormat.jm().format(dt); // Using AM/PM format
+    return DateFormat.jm().format(dt);
   }
 
   String _formatTimeOfDayForApi(TimeOfDay tod) {
@@ -326,9 +379,9 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
           if (_endTime != null &&
               (_endTime!.hour < picked.hour ||
                   (_endTime!.hour == picked.hour && _endTime!.minute < picked.minute))) {
-            _endTime = null; // Reset end time if it's before new start time
+            _endTime = null;
           }
-        } else { // isEndTime
+        } else {
           if (_startTime != null &&
               (picked.hour < _startTime!.hour ||
                   (picked.hour == _startTime!.hour && picked.minute < _startTime!.minute))) {
@@ -342,9 +395,7 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
       });
     }
   }
-  // --- End Availability Helper Methods ---
 
-  // --- Availability UI Widgets (from CreateCourseScreen) ---
   Widget _buildDayToggle(String day) {
     final isSelected = _selectedDays.contains(day);
     return GestureDetector(
@@ -438,7 +489,7 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
           ),
         ),
         TableCalendar(
-          firstDay: DateTime.utc(2020, 1, 1), // Allow past dates for editing
+          firstDay: DateTime.utc(2020, 1, 1),
           lastDay: DateTime.utc(2030, 12, 31),
           focusedDay: _calendarFocusedDay,
           calendarFormat: CalendarFormat.month,
@@ -450,13 +501,14 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
                 _calendarSelectedDay = selectedDay;
                 _calendarFocusedDay = focusedDay;
               } else {
-                _calendarSelectedDay = null; // Deselect if tapped again
+                _calendarSelectedDay = null;
               }
             });
           },
           onPageChanged: (focusedDay) {
             if (!mounted) return;
-            _calendarFocusedDay = focusedDay; // No setState needed, calendar handles internal focus
+            _calendarFocusedDay = focusedDay; // Update internal focus day
+            // No setState needed for onPageChanged if TableCalendar handles its own redraw
           },
           headerStyle: HeaderStyle(
             formatButtonVisible: false,
@@ -478,86 +530,182 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
       ],
     );
   }
-  // --- End Availability UI Widgets ---
 
+  // --- NEW: Widget for Subjects Dropdown (similar to CreateCourseScreen) ---
+  Widget _buildSubjectsDropdown() {
+    if (_isLoadingSubjects && _subjectsList.isEmpty) { // Show loader only if subjects list is still empty
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16.0),
+        child: Center(child: CircularProgressIndicator(color: primaryTeal)),
+      );
+    }
+
+    if (_subjectsList.isEmpty && !_isLoadingSubjects) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
+        child: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange[700]),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'No subjects found. Please add subjects first.',
+                style: TextStyle(color: Colors.orange[700], fontStyle: FontStyle.italic),
+              ),
+            ),
+            IconButton(
+              icon: Icon(Icons.refresh, color: Colors.blueGrey[600]),
+              onPressed: _isLoadingSubjects ? null : _fetchSubjects, // Disable while loading
+              tooltip: 'Refresh Subjects',
+            )
+          ],
+        ),
+      );
+    }
+
+    // Ensure _selectedSubjectId is valid or nullify
+    // This check is important if the previously selected subject was deleted
+    String? currentValidSubjectId = _selectedSubjectId;
+    if (currentValidSubjectId != null && !_subjectsList.any((s) => s['id'].toString() == currentValidSubjectId)) {
+      print("Previously selected subject ID '$currentValidSubjectId' is no longer valid. Clearing selection.");
+      currentValidSubjectId = null;
+      // Optionally, update _selectedSubjectId in setState if you want the UI to immediately reflect this
+      // WidgetsBinding.instance.addPostFrameCallback((_) {
+      //   if (mounted) setState(() => _selectedSubjectId = null);
+      // });
+    }
+
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Subject',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            decoration: InputDecoration(
+              hintText: 'Select a Subject',
+              hintStyle: TextStyle(color: Colors.grey[500]),
+              filled: true,
+              fillColor: Colors.grey[100],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: primaryTeal),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 15.0),
+            ),
+            value: currentValidSubjectId, // Use the validated subject ID
+            isExpanded: true,
+            items: _subjectsList.map((subject) {
+              final String subjectId = subject['id']?.toString() ?? '';
+              final String subjectName = subject['subject_name']?.toString() ?? 'Unnamed Subject ($subjectId)';
+              return DropdownMenuItem<String>(
+                value: subjectId,
+                child: Text(subjectName),
+              );
+            }).toList(),
+            onChanged: (String? newValue) {
+              if (mounted) {
+                setState(() {
+                  _selectedSubjectId = newValue;
+                });
+              }
+            },
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please select a subject';
+              }
+              return null;
+            },
+          ),
+        ],
+      ),
+    );
+  }
+  // --- END NEW ---
 
   Future<void> _handleUpdateCourse() async {
-    if (_isLoading) return;
+    if (_isSaving) return;
 
     final String courseTitle = _titleController.text.trim();
     final String courseDescription = _descriptionController.text.trim();
 
     if (courseTitle.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a course title.'), backgroundColor: Colors.orange));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a course title.'), backgroundColor: Colors.orange));
       return;
     }
+    // --- MODIFIED: Use _selectedSubjectId for validation ---
     if (_selectedSubjectId == null || _selectedSubjectId!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Subject ID is missing or invalid.'), backgroundColor: Colors.orange));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a subject.'), backgroundColor: Colors.orange));
       return;
     }
-    // Validate availability times if days or date are selected
+    // --- END MODIFIED ---
     if ((_selectedDays.isNotEmpty || _calendarSelectedDay != null) && (_startTime == null || _endTime == null)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select start and end times for availability.'), backgroundColor: Colors.orange));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select start and end times for availability.'), backgroundColor: Colors.orange));
       return;
     }
 
+    if (mounted) setState(() { _isSaving = true; _errorMessage = null; });
 
-    setState(() { _isLoading = true; _errorMessage = null; });
-
-    String? finalImageIdToSave; // This will be null if no new image, or new image ID
+    String? finalImageIdToSave = _existingCourseImageId; // Start with existing, may change
     bool courseUpdateSuccess = false;
-    bool availabilityUpdateSuccess = true; // Assume success unless an error occurs
+    bool availabilityUpdateSuccess = true;
     List<String> availabilityErrors = [];
     Map<String, dynamic>? updatedCourseData;
 
-
     try {
-      // 1. Handle Image Upload (if new image picked)
       if (_newCourseImageFile != null) {
         final imageUploadResponse = await _directusService.uploadFile(_newCourseImageFile!);
         if (imageUploadResponse['success'] && imageUploadResponse['data'] != null) {
           finalImageIdToSave = imageUploadResponse['data']['id']?.toString();
         } else {
           _errorMessage = 'Failed to upload new image: ${imageUploadResponse['message']}';
-          throw Exception(_errorMessage); // Stop execution
+          throw Exception(_errorMessage);
         }
-      }
-      // If no new image, finalImageIdToSave remains null.
-      // The service's updateCourse method handles not changing the image if this is null.
+      } // If _newCourseImageFile is null, finalImageIdToSave remains _existingCourseImageId or becomes null if that was also null.
+      // The updateCourse service method should handle `null` for courseImageId to mean "do not change image" or "remove image" based on your service logic.
+      // For Directus PATCH, not sending the 'course_image' field leaves it unchanged.
+      // Sending 'course_image': null would clear it.
+      // Here, we ensure `updateCourse` receives either a new ID or the existing ID (or null if it was never set/cleared).
+      // To explicitly remove: you might need another UI action and pass `null` for `finalImageIdToSave`
+      // when `_existingCourseImageId` was present but user wants to remove.
+      // For now, if _newCourseImageFile is null, we assume we keep the existing or what `updateCourse` does with null.
 
-      // 2. Update Course Core Details
+
       final courseResponse = await _directusService.updateCourse(
         courseId: widget.courseId,
         title: courseTitle,
         description: courseDescription,
-        subjectId: _selectedSubjectId!,
-        courseImageId: finalImageIdToSave, // Pass new ID or null (service handles 'no change')
+        subjectId: _selectedSubjectId!, // Use the dynamic subject ID
+        courseImageId: finalImageIdToSave,
       );
 
       if (courseResponse['success']) {
         courseUpdateSuccess = true;
         updatedCourseData = courseResponse['data'];
 
-        // 3. Handle Availability (Delete old, Create new)
         if (_courseTutorProfileId != null) {
-          // Delete old recurring availability
           if (_initialRecurringAvailabilityId != null) {
             final delRes = await _directusService.deleteTutorAvailability(_initialRecurringAvailabilityId!);
-            if (!delRes['success']) {
-              availabilityUpdateSuccess = false;
-              availabilityErrors.add('Old recurring: ${delRes['message']}');
-            }
+            if (!delRes['success']) { availabilityUpdateSuccess = false; availabilityErrors.add('Old recurring: ${delRes['message']}'); }
           }
-          // Delete old specific date availability
           if (_initialSpecificDateAvailabilityId != null) {
             final delRes = await _directusService.deleteTutorAvailability(_initialSpecificDateAvailabilityId!);
-            if (!delRes['success']) {
-              availabilityUpdateSuccess = false;
-              availabilityErrors.add('Old specific: ${delRes['message']}');
-            }
+            if (!delRes['success']) { availabilityUpdateSuccess = false; availabilityErrors.add('Old specific: ${delRes['message']}'); }
           }
 
-          // Create new availabilities if times are set
           if (_startTime != null && _endTime != null) {
             if (_selectedDays.isNotEmpty) {
               List<String> recurringDaysList = _selectedDays.map((shortDay) => _dayMapping[shortDay]!).where((day) => day.isNotEmpty).toList();
@@ -581,7 +729,6 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
           }
         } else {
           availabilityErrors.add("Tutor profile ID missing, can't update availability.");
-          availabilityUpdateSuccess = false; // Technically true as nothing was attempted.
         }
       } else {
         _errorMessage = courseResponse['message'] ?? 'Failed to update course details.';
@@ -590,17 +737,16 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
       _errorMessage = _errorMessage ?? "An error occurred: ${e.toString()}";
     } finally {
       if (mounted) {
-        setState(() { _isLoading = false; });
-        if (_errorMessage != null && !courseUpdateSuccess) { // Major failure
+        setState(() { _isSaving = false; });
+        if (_errorMessage != null && !courseUpdateSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_errorMessage!), backgroundColor: Colors.red, duration: const Duration(seconds: 5)));
         } else if (courseUpdateSuccess && availabilityUpdateSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Course "${updatedCourseData?['title'] ?? courseTitle}" and availability updated!'), backgroundColor: Colors.green));
-          Navigator.of(context).pop(true);
+          Navigator.of(context).pop(true); // Indicate success
         } else if (courseUpdateSuccess && !availabilityUpdateSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Course updated. Availability issues: ${availabilityErrors.join("; ")}'), backgroundColor: Colors.orange, duration: const Duration(seconds: 7)));
-          Navigator.of(context).pop(true); // Still pop, course was saved
+          Navigator.of(context).pop(true); // Indicate success for course part
         } else {
-          // Catch all for other unhandled _errorMessage states
           if(_errorMessage != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_errorMessage!), backgroundColor: Colors.red, duration: const Duration(seconds: 5)));
         }
       }
@@ -610,8 +756,6 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // final Color primaryColor = Theme.of(context).primaryColor; // Using defined primaryTeal
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -622,14 +766,14 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
         ),
         title: const Text('Edit Course', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w500)),
       ),
-      body: _isLoading && _titleController.text.isEmpty // Initial full page loader
+      body: _isLoadingPage
           ? const Center(child: CircularProgressIndicator(color: primaryTeal))
           : SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 100), // Space for bottom sheet
+        padding: const EdgeInsets.only(bottom: 100),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (_errorMessage != null && !_isLoading) // Show error if not loading and error exists
+            if (_errorMessage != null && !_isSaving) // Show error if not saving and error exists
               Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 16))
@@ -647,19 +791,18 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
                     decoration: InputDecoration(
                       hintText: 'E.g., Introduction to Algebra',
                       filled: true, fillColor: Colors.grey[100],
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey[300]!)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey[300]!)),
                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: primaryTeal)),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Subject ID: ${_selectedSubjectId ?? "Not set"} (Implement dynamic subject selection/display)',
-                    style: TextStyle(color: _selectedSubjectId == null ? Colors.red : Colors.orange[700], fontSize: 12),
-                  ),
+                  // --- MODIFIED: Add the subjects dropdown ---
+                  _buildSubjectsDropdown(),
+                  // --- END MODIFIED ---
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            // const SizedBox(height: 16), // Adjusted spacing due to dropdown adding its own padding
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
@@ -673,7 +816,8 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
                     decoration: InputDecoration(
                       hintText: 'Course description...',
                       filled: true, fillColor: Colors.grey[100],
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey[300]!)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey[300]!)),
                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: primaryTeal)),
                     ),
                   ),
@@ -681,24 +825,21 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            // --- Add Availability UI Sections ---
-            if (_courseTutorProfileId != null) ...[ // Only show if tutor ID is available
+            if (_courseTutorProfileId != null) ...[
               _buildClassSchedule(),
               const SizedBox(height: 24),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: _buildCalendarSection(),
               ),
-            ] else if (!_isLoading) // If not loading and no tutor ID, show a message
+            ] else if (!_isLoadingPage)
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
-                    "Availability section cannot be loaded: Course tutor information is missing.",
+                    "Availability section cannot be loaded: Course tutor information is missing or could not be loaded.",
                     style: TextStyle(color: Colors.grey[600])
                 ),
               ),
-
-            // const SizedBox(height: 120), // Already handled by SingleChildScrollView padding
           ],
         ),
       ),
@@ -712,8 +853,8 @@ class _EditCourseScreenState extends State<EditCourseScreen> {
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            onPressed: _isLoading ? null : _handleUpdateCourse,
-            child: _isLoading
+            onPressed: _isLoadingPage || _isSaving ? null : _handleUpdateCourse, // Disable if page is loading or saving
+            child: _isSaving
                 ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
                 : const Text('Save Changes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
           ),

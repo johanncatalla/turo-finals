@@ -1341,4 +1341,55 @@ class DirectusService {
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
+  // Fetch all subjects (alternative to getSubjects or if a different naming is preferred)
+  Future<Map<String, dynamic>> fetchSubjects() async {
+    // Check if the base URL is configured
+    if (baseUrl == null) {
+      return {'success': false, 'message': 'Directus API URL is not configured.'};
+    }
+
+    try {
+      // Retrieve the admin token from environment variables
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+
+      // Check if the admin token is available
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      // Optional: Print a debug message
+      // print('Fetching subjects from Directus using fetchSubjects()...');
+
+      // Make the HTTP GET request to the 'Subjects' collection endpoint
+      final response = await http.get(
+        Uri.parse('$baseUrl/items/Subjects?fields=*'), // Assuming 'Subjects' is your collection key and you want all fields
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken', // Use Bearer token for authorization
+        },
+      );
+
+      // Decode the JSON response body
+      final responseData = jsonDecode(response.body);
+
+      // Check if the request was successful (HTTP status code 200)
+      if (response.statusCode == 200) {
+        // Optional: Print success message with the number of subjects fetched
+        // print('Successfully fetched ${responseData['data']?.length ?? 0} subjects.');
+        return {'success': true, 'data': responseData['data']};
+      } else {
+        // Handle errors based on the response from Directus
+        final errorMessage = responseData['errors']?[0]?['message'] ?? 'Failed to fetch subjects';
+        // print('Error fetching subjects: $errorMessage (Status: ${response.statusCode})');
+        return {
+          'success': false,
+          'message': errorMessage,
+        };
+      }
+    } catch (e) {
+      // Handle network errors or other exceptions during the request
+      // print('Network error fetching subjects: ${e.toString()}');
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
 }

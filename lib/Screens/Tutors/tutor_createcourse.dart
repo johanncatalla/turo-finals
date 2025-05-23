@@ -2,11 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:image_picker/image_picker.dart'; // << NEW: Import image_picker
-import 'dart:io'; // << NEW: Import for File operations
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
-import '../../services/directus_service.dart';
-
+import '../../services/directus_service.dart'; // Ensure this path is correct
 
 enum CourseTab { lecturer, materials }
 
@@ -21,7 +20,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
     with SingleTickerProviderStateMixin {
   final DirectusService _directusService = DirectusService();
   String? _currentTutorProfileId;
-  bool _isLoading = false;
+  bool _isLoading = false; // General loading for save button
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
@@ -33,9 +32,13 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   DateTime _calendarFocusedDay = DateTime.now();
   DateTime? _calendarSelectedDay;
 
-  // --- NEW: For Image Upload ---
   XFile? _courseImageFile;
   final ImagePicker _picker = ImagePicker();
+
+  // --- NEW: For Subjects Dropdown ---
+  List<Map<String, dynamic>> _subjectsList = [];
+  String? _selectedSubjectId;
+  bool _isLoadingSubjects = false; // Specific loading for subjects dropdown
   // --- END NEW ---
 
   final Map<String, String> _dayMapping = {
@@ -53,35 +56,60 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _fetchCurrentTutorProfileId();
+    _fetchSubjects(); // << NEW: Call to fetch subjects
   }
 
   Future<void> _fetchCurrentTutorProfileId() async {
-    // ... (your existing _fetchCurrentTutorProfileId method - no changes needed here)
     final response = await _directusService.fetchTutorProfile();
     if (mounted) {
       if (response['success'] == true && response['data'] != null) {
         final userData = response['data'];
-        final tutorProfileData = userData['tutor_profile'][0];
-
-        if (tutorProfileData != null && tutorProfileData is Map) {
-          if (tutorProfileData['id'] != null) {
-            setState(() {
-              _currentTutorProfileId = tutorProfileData['id'].toString();
-              print("Current Tutor Profile ID: $_currentTutorProfileId");
-            });
+        // Assuming tutor_profile is a list from your previous fetchTutorProfile structure
+        if (userData['tutor_profile'] != null && userData['tutor_profile'] is List && userData['tutor_profile'].isNotEmpty) {
+          final tutorProfileData = userData['tutor_profile'][0]; // Take the first profile
+          if (tutorProfileData != null && tutorProfileData is Map) {
+            if (tutorProfileData['id'] != null) {
+              setState(() {
+                _currentTutorProfileId = tutorProfileData['id'].toString();
+                print("Current Tutor Profile ID: $_currentTutorProfileId");
+              });
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Tutor profile data is incomplete (missing ID).'),
+                    backgroundColor: Colors.orange),
+              );
+            }
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                  content: Text('Tutor profile data is incomplete (missing ID).'),
+                  content: Text('Tutor profile data format is unexpected.'),
                   backgroundColor: Colors.orange),
             );
           }
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('No tutor profile found for this user or it could not be resolved. Please ensure a tutor profile exists and is linked.'),
-                backgroundColor: Colors.orange),
-          );
+          // Handle case where tutor_profile might be a direct object or not a list
+          if (userData['tutor_profile'] != null && userData['tutor_profile'] is Map) {
+            final tutorProfileData = userData['tutor_profile'];
+            if (tutorProfileData['id'] != null) {
+              setState(() {
+                _currentTutorProfileId = tutorProfileData['id'].toString();
+                print("Current Tutor Profile ID (direct object): $_currentTutorProfileId");
+              });
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Tutor profile data (direct object) is incomplete (missing ID).'),
+                    backgroundColor: Colors.orange),
+              );
+            }
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('No tutor profile found for this user or it could not be resolved. Please ensure a tutor profile exists and is linked.'),
+                  backgroundColor: Colors.orange),
+            );
+          }
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -93,6 +121,49 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
     }
   }
 
+  // --- NEW: Method to fetch subjects ---
+  Future<void> _fetchSubjects() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingSubjects = true;
+      _subjectsList = []; // Clear previous list
+      _selectedSubjectId = null; // Reset selected subject
+    });
+
+    final response = await _directusService.fetchSubjects(); // Using the method created earlier
+
+    if (!mounted) return;
+
+    if (response['success'] == true && response['data'] != null) {
+      final List<dynamic> fetchedData = response['data'];
+      setState(() {
+        _subjectsList = List<Map<String, dynamic>>.from(fetchedData);
+        _isLoadingSubjects = false;
+      });
+      if (_subjectsList.isNotEmpty) {
+        print("Fetched ${_subjectsList.length} subjects.");
+      } else {
+        print("No subjects found.");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No subjects available to select.'), backgroundColor: Colors.orange),
+          );
+        }
+      }
+    } else {
+      setState(() {
+        _isLoadingSubjects = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Failed to fetch subjects: ${response['message'] ?? 'Unknown error'}'),
+              backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+  // --- END NEW ---
 
   @override
   void dispose() {
@@ -102,21 +173,19 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
     super.dispose();
   }
 
-  // --- NEW: Image Picker Method ---
   Future<void> _pickCourseImage() async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
-        source: ImageSource.gallery, // Or ImageSource.camera
-        imageQuality: 70, // Optional: to reduce file size
-        maxWidth: 1024,   // Optional: to resize image
-        maxHeight: 1024,  // Optional: to resize image
+        source: ImageSource.gallery,
+        imageQuality: 70,
+        maxWidth: 1024,
+        maxHeight: 1024,
       );
       if (pickedFile != null) {
         setState(() {
           _courseImageFile = pickedFile;
         });
       } else {
-        // User canceled the picker
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('No image selected.')),
@@ -132,10 +201,8 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
       }
     }
   }
-  // --- END NEW ---
 
   String _formatTimeOfDayForDisplay(TimeOfDay? tod) {
-    // ... (your existing method)
     if (tod == null) return '00:00';
     final now = DateTime.now();
     final dt = DateTime(now.year, now.month, now.day, tod.hour, tod.minute);
@@ -144,7 +211,6 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   String _formatTimeOfDayForApi(TimeOfDay? tod) {
-    // ... (your existing method)
     if (tod == null) return '00:00:00';
     final hour = tod.hour.toString().padLeft(2, '0');
     final minute = tod.minute.toString().padLeft(2, '0');
@@ -152,13 +218,11 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   String _formatDateForApi(DateTime? date) {
-    // ... (your existing method)
     if (date == null) return '';
     return DateFormat('yyyy-MM-dd').format(date);
   }
 
   String _getDayNameFromWeekday(int weekday) {
-    // ... (your existing method)
     switch (weekday) {
       case DateTime.monday: return 'Monday';
       case DateTime.tuesday: return 'Tuesday';
@@ -172,7 +236,6 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   Future<void> _selectTime(BuildContext context, bool isStartTime) async {
-    // ... (your existing method - no changes needed here)
     final TimeOfDay initialTime = isStartTime
         ? (_startTime ?? TimeOfDay.now())
         : (_endTime ?? _startTime ?? TimeOfDay.now());
@@ -223,7 +286,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
 
     final String courseTitle = _titleController.text.trim();
     final String courseDescription = _descriptionController.text.trim();
-    final String? subjectId = "3"; // TODO: Replace with dynamic subject ID
+    final String? subjectId = _selectedSubjectId; // << NEW: Use the selected subject ID
 
     // Validations
     if (_currentTutorProfileId == null) {
@@ -238,12 +301,14 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
       );
       return;
     }
+    // --- MODIFIED: Validation for Subject ID ---
     if (subjectId == null || subjectId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Subject ID is missing. Please select a subject.'), backgroundColor: Colors.orange),
+        const SnackBar(content: Text('Please select a subject for the course.'), backgroundColor: Colors.orange),
       );
       return;
     }
+    // --- END MODIFIED ---
     if (_startTime == null || _endTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select start and end times for availability.'), backgroundColor: Colors.orange),
@@ -259,9 +324,8 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
 
     setState(() { _isLoading = true; });
 
-    String? uploadedCourseImageId; // << MODIFIED: To store the uploaded image ID
+    String? uploadedCourseImageId;
 
-    // --- MODIFIED: Step 1. Upload the course_image ---
     if (_courseImageFile != null) {
       final imageUploadResponse = await _directusService.uploadFile(_courseImageFile!);
       if (imageUploadResponse['success'] == true && imageUploadResponse['data'] != null) {
@@ -285,18 +349,17 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
           ),
         );
         setState(() { _isLoading = false; });
-        return; // Stop if image upload fails
+        return;
       }
     }
-    // --- END MODIFIED ---
 
     // 2. Create the Course
     final courseResponse = await _directusService.createCourse(
       title: courseTitle,
       description: courseDescription,
-      subjectId: subjectId,
+      subjectId: subjectId, // Pass the dynamic subjectId here
       tutorId: _currentTutorProfileId!,
-      courseImageId: uploadedCourseImageId, // << MODIFIED: Pass the image ID
+      courseImageId: uploadedCourseImageId,
     );
 
     if (courseResponse['success'] != true) {
@@ -345,7 +408,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
       final String dayNameForSpecificDate = _getDayNameFromWeekday(_calendarSelectedDay!.weekday);
       final availabilityResponse = await _directusService.createTutorAvailability(
         tutorId: _currentTutorProfileId!,
-        daysOfWeek: [dayNameForSpecificDate],
+        daysOfWeek: [dayNameForSpecificDate], // Pass as a list
         startTime: _formatTimeOfDayForApi(_startTime!),
         endTime: _formatTimeOfDayForApi(_endTime!),
         recurring: false,
@@ -365,17 +428,20 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
             content: Text('All tutor availability slots created successfully!'),
             backgroundColor: Colors.green),
       );
-      // Optionally clear form or navigate:
-      // _titleController.clear();
-      // _descriptionController.clear();
-      // setState(() {
-      //   _courseImageFile = null;
-      //   _selectedDays.clear();
-      //   _startTime = null;
-      //   _endTime = null;
-      //   _calendarSelectedDay = null;
-      // });
-      // Navigator.of(context).pop();
+      // Optionally clear form or navigate
+      _titleController.clear();
+      _descriptionController.clear();
+      setState(() {
+        _courseImageFile = null;
+        _selectedSubjectId = null; // Clear selected subject
+        _selectedDays.clear();
+        _startTime = null;
+        _endTime = null;
+        _calendarSelectedDay = null;
+      });
+      if (mounted) { // check if widget is still in tree
+        // Navigator.of(context).pop(); // Example navigation
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -387,10 +453,8 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
     }
   }
 
-
   // --- UI Widgets ---
 
-  // --- NEW: Widget for Image Picker and Preview ---
   Widget _buildCourseImagePicker() {
     return GestureDetector(
       onTap: _pickCourseImage,
@@ -404,7 +468,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
           border: Border.all(color: Colors.grey[350]!, width: 1.5),
         ),
         child: _courseImageFile == null
-            ? Column( // Placeholder UI when no image is selected
+            ? Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.cloud_upload_rounded, size: 60, color: Colors.grey[500]),
@@ -420,35 +484,122 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
             ),
           ],
         )
-            : ClipRRect( // Display the selected image
-          borderRadius: BorderRadius.circular(10.5), // Slightly less than container radius for better look
-          child: kIsWeb // <<<< MODIFICATION START >>>>
-              ? Image.network( // Use Image.network for web
+            : ClipRRect(
+          borderRadius: BorderRadius.circular(10.5),
+          child: kIsWeb
+              ? Image.network(
             _courseImageFile!.path,
             fit: BoxFit.cover,
             width: double.infinity,
             height: double.infinity,
-            // Optional: Add errorBuilder for web network image
             errorBuilder: (context, error, stackTrace) {
               print("Error loading web image: $error");
               return const Center(child: Text("Couldn't display image"));
             },
           )
-              : Image.file( // Use Image.file for mobile/desktop
+              : Image.file(
             File(_courseImageFile!.path),
             fit: BoxFit.cover,
             width: double.infinity,
             height: double.infinity,
-          ), // <<<< MODIFICATION END >>>>
+          ),
         ),
+      ),
+    );
+  }
+
+  // --- NEW: Widget for Subjects Dropdown ---
+  Widget _buildSubjectsDropdown() {
+    if (_isLoadingSubjects) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16.0),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_subjectsList.isEmpty && !_isLoadingSubjects) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
+        child: Row( // Use a Row for icon and text
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange[700]),
+            const SizedBox(width: 8),
+            Expanded( // Use Expanded to allow text to wrap
+              child: Text(
+                'No subjects found. Please add subjects first.',
+                style: TextStyle(color: Colors.orange[700], fontStyle: FontStyle.italic),
+              ),
+            ),
+            IconButton( // Add a refresh button
+              icon: Icon(Icons.refresh, color: Colors.blueGrey[600]),
+              onPressed: _fetchSubjects,
+              tooltip: 'Refresh Subjects',
+            )
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Subject',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            decoration: InputDecoration(
+              hintText: 'Select a Subject',
+              hintStyle: TextStyle(color: Colors.grey[500]),
+              filled: true,
+              fillColor: Colors.grey[100],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Theme.of(context).primaryColor),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 15.0),
+            ),
+            value: _selectedSubjectId,
+            isExpanded: true,
+            items: _subjectsList.map((subject) {
+              final String subjectId = subject['id']?.toString() ?? '';
+              final String subjectName = subject['subject_name'].toString();
+
+              return DropdownMenuItem<String>(
+                value: subjectId,
+                child: Text(subjectName),
+              );
+            }).toList(),
+            onChanged: (String? newValue) {
+              setState(() {
+                _selectedSubjectId = newValue;
+              });
+            },
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please select a subject';
+              }
+              return null;
+            },
+          ),
+        ],
       ),
     );
   }
   // --- END NEW ---
 
-
   Widget _buildDayToggle(String day) {
-    // ... (your existing method)
     final isSelected = _selectedDays.contains(day);
     return GestureDetector(
       onTap: () {
@@ -478,7 +629,6 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   Widget _buildClassSchedule() {
-    // ... (your existing method)
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Column(
@@ -568,7 +718,6 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   Widget _buildLecturerTabContent() {
-    // ... (your existing method)
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 8.0),
       child: Row(
@@ -598,7 +747,6 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   Widget _buildMaterialsTabContent() {
-    // ... (your existing method)
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24.0),
       child: Container(
@@ -641,7 +789,6 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
   }
 
   Widget _buildCalendarSection() {
-    // ... (your existing method)
     return Column(
       children: [
         Container(
@@ -729,7 +876,6 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
 
     return Scaffold(
       appBar: AppBar(
-        // ... (your existing AppBar)
         backgroundColor: Colors.white,
         elevation: 1,
         leading: IconButton(
@@ -752,9 +898,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- MODIFIED: Use the new image picker widget ---
             _buildCourseImagePicker(),
-            // --- END MODIFIED ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
@@ -786,15 +930,11 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Note: Subject ID is currently hardcoded. Implement dynamic subject selection.',
-                    style: TextStyle(color: Colors.orange[700], fontSize: 12),
-                  ),
+                  _buildSubjectsDropdown(), // << NEW: Add the dropdown here
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            // const SizedBox(height: 16), // Adjusted spacing due to dropdown adding its own padding
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
@@ -875,7 +1015,6 @@ class _CreateCourseScreenState extends State<CreateCourseScreen>
         ),
       ),
       bottomSheet: Padding(
-        // ... (your existing bottomSheet - no changes needed here, already handles _isLoading)
         padding: const EdgeInsets.all(16.0),
         child: SizedBox(
           width: double.infinity,
