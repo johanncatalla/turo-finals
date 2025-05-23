@@ -13,7 +13,8 @@ import '../../screens/Tutors/tabs/courses_tab.dart';
 import '../../screens/Tutors/tabs/modules_tab.dart';
 import '../../screens/Tutors/tabs/reviews_tab.dart';
 // Import TutorHomepage if needed for navigation
-import '../../screens/Tutors/tutor_homepage.dart'; // Assuming this is the path
+import '../../screens/Tutors/tutor_homepage.dart';
+import 'EditTutorProfileScreen.dart'; // Assuming this is the path
 
 // Data Models (keep as they were)
 class Course {
@@ -144,6 +145,10 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
     setState(() {
       isLoading = true;
       errorMessage = null;
+      // Reset data to avoid showing stale info during reload
+      userData = null;
+      tutorProfileData = null;
+      subjectsData = null;
     });
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -161,78 +166,86 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
     final userID = authProvider.user!.id;
 
     try {
-      // Fetch full user profile which should include 'avatar'
-      // Assuming AuthProvider might have a method like getFullUserProfile or
-      // _directusService.fetchUserById(userID) if directus_service handles fetching generic user data
-      final userProfileResponse = await authProvider.getFullUserProfile(); // ADAPT THIS LINE
+      // Step 1: Get basic user data (first_name, last_name, avatar) from AuthProvider
+      // This assumes getFullUserProfile in AuthProvider is reliable for these root fields.
+      final authUserResponse = await authProvider.getFullUserProfile();
 
-      if (mounted) {
-        if (userProfileResponse['success']) {
-          userData = userProfileResponse['data']; // This should contain 'avatar' and other user fields
+      if (!mounted) return;
 
-          // Now fetch the tutor-specific profile part
-          // This might be redundant if getFullUserProfile already includes expanded tutor_profile
-          final tutorSpecificProfileResult = await _directusService.fetchTutorProfileByUserId(userID);
-          if (tutorSpecificProfileResult['success']) {
-            final tutorData = tutorSpecificProfileResult['data'];
-            // The 'tutorData' might be the direct user object with 'tutor_profile' nested,
-            // or it might be the 'tutor_profile' item itself. Adjust based on your Directus setup.
-            // For now, let's assume 'tutorData' is the user object and we need to extract 'tutor_profile'.
+      if (authUserResponse['success']) {
+        userData = authUserResponse['data']; // Contains first_name, last_name, email, avatar
+        // but 'tutor_profile' here might be unexpanded (e.g., [1])
+      } else {
+        errorMessage = authUserResponse['message'] ?? "Failed to load basic user profile.";
+        // Don't stop here if basic user data fails, still try to get tutor specific,
+        // but the UI will show an error if userData remains null.
+      }
 
-            // If userData from getFullUserProfile is more comprehensive, prefer it for 'avatar'
-            // and merge/extract tutor_profile details.
-            // For simplicity, let's assume fetchTutorProfileByUserId gives us the user object with tutor_profile
-            // and also includes the 'avatar' at the root level of the user object.
-            // If not, ensure `userData` is populated from a source that includes 'avatar'.
+      // Step 2: Get expanded tutor-specific profile data directly using the service
+      // This response should contain the fully expanded 'tutor_profile' object
+      final expandedTutorProfileResponse = await _directusService.fetchTutorProfileByUserId(userID);
 
-            // Let's assume `userProfileResponse['data']` (now `userData`) contains the direct user fields
-            // like first_name, last_name, avatar.
-            // And `tutorSpecificProfileResult['data']` might be the user object again, or just the tutor_profile.
-            // We need to be careful not to overwrite `userData` if `tutorSpecificProfileResult` is less complete for root fields.
+      if (!mounted) return;
 
-            // Let's refine:
-            // 1. Get full user data (including avatar)
-            // 2. Extract/get tutor specific profile data
-
-            // Assuming userData is already populated from getFullUserProfile
-            if (userData != null) {
-              var tutorProfileField = userData!['tutor_profile']; // Assuming tutor_profile is a field in the main user data
-              if (tutorProfileField != null && tutorProfileField is List && tutorProfileField.isNotEmpty) {
-                if (tutorProfileField[0] is Map<String, dynamic>){
-                  tutorProfileData = tutorProfileField[0];
-                  if (tutorProfileData!.containsKey('subjects')) {
-                    subjectsData = tutorProfileData!['subjects'];
-                  }
-                } else {
-                  tutorProfileData = {}; // Handle case where it's not a map
-                  subjectsData = [];
-                }
-              } else if (tutorProfileField is Map<String, dynamic>) { // If it's a direct object (to-one relation)
-                tutorProfileData = tutorProfileField;
-                if (tutorProfileData!.containsKey('subjects')) {
-                  subjectsData = tutorProfileData!['subjects'];
-                }
-              }
-              else { // No tutor profile data or unexpected format
-                tutorProfileData = {};
-                subjectsData = [];
-              }
-            } else { // userData itself is null after getFullUserProfile
-              errorMessage = userProfileResponse['message'] ?? "Failed to load user profile.";
-            }
-
-          } else { // Failed to get tutor-specific details
-            // We might still have basic user data from getFullUserProfile
-            if (userData == null) { // If even basic user data failed
-              errorMessage = tutorSpecificProfileResult['message'] ?? "Failed to load tutor profile details.";
+      if (expandedTutorProfileResponse['success']) {
+        final fetchedData = expandedTutorProfileResponse['data'];
+        if (fetchedData != null) {
+          // If 'userData' wasn't populated from AuthProvider, use this as a fallback for root fields too
+          if (userData == null) {
+            userData = {
+              'first_name': fetchedData['first_name'],
+              'last_name': fetchedData['last_name'],
+              'email': fetchedData['email'],
+              'avatar': fetchedData['avatar'],
+              // any other root fields you expect
+            };
+          } else {
+            // Ensure avatar from this more specific call is used if it exists and differs,
+            // or if it wasn't in authProvider's version.
+            if (fetchedData['avatar'] != null) {
+              userData!['avatar'] = fetchedData['avatar'];
             }
           }
-        } else { // getFullUserProfile failed
-          errorMessage = userProfileResponse['message'] ?? "Failed to load primary user profile.";
+
+
+          // Extract the 'tutor_profile' part from the *expanded* response
+          final rawTutorProfile = fetchedData['tutor_profile'];
+          // print('TutorProfileScreen - Raw tutor_profile from fetchTutorProfileByUserId: $rawTutorProfile');
+
+
+          if (rawTutorProfile is List && rawTutorProfile.isNotEmpty) {
+            if (rawTutorProfile[0] is Map<String, dynamic>) {
+              tutorProfileData = rawTutorProfile[0] as Map<String, dynamic>;
+            }
+          } else if (rawTutorProfile is Map<String, dynamic>) {
+            tutorProfileData = rawTutorProfile;
+          }
+
+          if (tutorProfileData != null) {
+            // print('TutorProfileScreen - Effective tutorProfileData: $tutorProfileData');
+            if (tutorProfileData!.containsKey('subjects') && tutorProfileData!['subjects'] is List) {
+              subjectsData = tutorProfileData!['subjects'] as List<dynamic>;
+            } else {
+              subjectsData = []; // Default if no subjects or wrong format
+            }
+          } else {
+            // print('TutorProfileScreen - tutorProfileData is null or not in expected format.');
+            tutorProfileData = {}; // Ensure it's not null for UI
+            subjectsData = [];
+          }
+        }
+      } else {
+        // If fetchTutorProfileByUserId fails, we might still have basic userData.
+        // Set an error message specifically for the tutor details part if basic data loaded.
+        if (userData != null && (tutorProfileData == null || tutorProfileData!.isEmpty)) {
+          errorMessage = (errorMessage == null ? "" : "$errorMessage\n") +
+              (expandedTutorProfileResponse['message'] ?? "Failed to load detailed tutor profile.");
+        } else if (userData == null) { // If basic data also failed
+          errorMessage = expandedTutorProfileResponse['message'] ?? "Failed to load any profile data.";
         }
       }
 
-
+      // Fetch courses (remains the same)
       if (courseProvider.courses.isEmpty && !courseProvider.isLoading) {
         await courseProvider.initialize();
       }
@@ -246,9 +259,9 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
       if (mounted) {
         setState(() {
           isLoading = false;
-          errorMessage = 'Failed to load data: ${e.toString()}';
+          errorMessage = 'An error occurred: ${e.toString()}';
         });
-        // print("Error in _loadInitialData: $e");
+        // print("Error in _loadInitialData (TutorProfileScreen): $e");
       }
     }
   }
@@ -529,15 +542,18 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
               ),
               const SizedBox(width: 16),
               OutlinedButton(
-                onPressed: () {
-                  // TODO: Navigate to an EditTutorProfileScreen
-                  // This screen would need its own state management for editing fields,
-                  // picking images, and saving, similar to StudentProfileScreen's _isEditing logic.
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Edit Profile (Tutor) - Not Implemented Yet'))
+                onPressed: () async {
+                  // Navigate to EditTutorProfileScreen and wait for result
+                  final result = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(builder: (context) => const EditTutorProfileScreen()),
                   );
+                  // If result is true, it means profile was saved, so refresh data
+                  if (result == true && mounted) {
+                    _loadInitialData(); // Reload profile data
+                  }
                 },
-                style: OutlinedButton.styleFrom( // Style like student profile
+                style: OutlinedButton.styleFrom(
                   foregroundColor: primaryTeal,
                   side: const BorderSide(color: primaryTeal, width: 1.5),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4.0)),

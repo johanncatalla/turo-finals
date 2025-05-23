@@ -1147,4 +1147,34 @@ class DirectusService {
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
+  Future<Map<String, dynamic>> updateTutorProfile(String tutorProfileId, Map<String, dynamic> profileData) async {
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      final response = await http.patch(
+        Uri.parse('$baseUrl/items/Tutors/$tutorProfileId'), // Or whatever your collection is named
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+        body: jsonEncode(profileData),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': data['data']};
+      } else {
+        return {
+          'success': false,
+          'message': data['errors']?[0]?['message'] ?? 'Failed to update tutor profile'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
 }
