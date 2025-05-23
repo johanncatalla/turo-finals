@@ -324,6 +324,76 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
     }
   }
 
+  bool _isDayAvailable(DateTime day) {
+    // Basic checks: not in the past and availability data is loaded
+    if (day.isBefore(DateTime.now().subtract(const Duration(days: 1))) || 
+        _tutorAvailability.isEmpty || 
+        _isLoadingAvailability) {
+      return false;
+    }
+    
+    final dayName = _getDayName(day.weekday);
+    
+    for (var availability in _tutorAvailability) {
+      final availableDays = availability['day_of_week'] as List?;
+      final isRecurring = availability['recurring'] == true;
+      
+      if (isRecurring && availableDays != null) {
+        if (availableDays.contains(dayName)) {
+          return true;
+        }
+      } else if (!isRecurring && availability['specific_date'] != null) {
+        try {
+          final specificDate = DateTime.parse(availability['specific_date']);
+          if (isSameDay(day, specificDate)) {
+            return true;
+          }
+        } catch (e) {
+          // Skip invalid dates
+          continue;
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  List<Map<String, TimeOfDay>> _getAvailableTimeSlotsForDay(DateTime day) {
+    final dayName = _getDayName(day.weekday);
+    final availableSlots = <Map<String, TimeOfDay>>[];
+    
+    for (var availability in _tutorAvailability) {
+      final availableDays = availability['day_of_week'] as List?;
+      final isRecurring = availability['recurring'] == true;
+      bool isDayAvailable = false;
+      
+      if (isRecurring && availableDays != null) {
+        isDayAvailable = availableDays.contains(dayName);
+      } else if (!isRecurring && availability['specific_date'] != null) {
+        try {
+          final specificDate = DateTime.parse(availability['specific_date']);
+          isDayAvailable = isSameDay(day, specificDate);
+        } catch (e) {
+          continue;
+        }
+      }
+      
+      if (isDayAvailable) {
+        final startTime = _parseTimeFromString(availability['start_time']);
+        final endTime = _parseTimeFromString(availability['end_time']);
+        
+        if (startTime != null && endTime != null) {
+          availableSlots.add({
+            'start': startTime,
+            'end': endTime,
+          });
+        }
+      }
+    }
+    
+    return availableSlots;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -421,6 +491,81 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
             color: widget.secondaryTextColor,
           ),
         ),
+        if (_isLoadingAvailability) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: widget.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: widget.primaryColor.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    color: widget.primaryColor,
+                    strokeWidth: 2,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Loading tutor availability...',
+                  style: TextStyle(color: widget.primaryColor),
+                ),
+              ],
+            ),
+          ),
+        ] else if (_availabilityError != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.red, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _availabilityError!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else if (_tutorAvailability.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.green.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info, color: Colors.green, size: 16),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Only available dates are selectable in the calendar',
+                    style: TextStyle(
+                      color: Colors.green[800],
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
 
         // Calendar
@@ -435,7 +580,7 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
             focusedDay: _focusedDay,
             calendarFormat: _calendarFormat,
             selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-            enabledDayPredicate: (day) => day.isAfter(DateTime.now().subtract(const Duration(days: 1))),
+            enabledDayPredicate: (day) => _isDayAvailable(day),
             onDaySelected: (selectedDay, focusedDay) {
               setState(() {
                 _selectedDay = selectedDay;
@@ -477,6 +622,72 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
             ),
           ),
           const SizedBox(height: 8),
+          
+          // Show available time slots for this day
+          Builder(
+            builder: (context) {
+              final availableSlots = _getAvailableTimeSlotsForDay(_selectedDay!);
+              if (availableSlots.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning, color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'No availability found for this day',
+                          style: TextStyle(color: Colors.orange[800]),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Available Time Slots:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: widget.secondaryTextColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: availableSlots.map((slot) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: widget.primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: widget.primaryColor.withOpacity(0.3)),
+                        ),
+                        child: Text(
+                          '${slot['start']!.format(context)} - ${slot['end']!.format(context)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: widget.primaryColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              );
+            },
+          ),
           Row(
             children: [
               Expanded(
