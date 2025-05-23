@@ -230,7 +230,7 @@ class DirectusService {
             // Extract just the course data for easier use
             final coursesList = junctionItems.map((item) => item).toList();
             profileData['enrolled_courses'] = coursesList;
-            print('Loaded ${coursesList.length} enrolled courses for profile');
+            // print('Loaded ${coursesList.length} enrolled courses for profile');
           } else {
             profileData['enrolled_courses'] = [];
             print('No enrolled courses found for user');
@@ -380,7 +380,7 @@ class DirectusService {
       // Send the request
       print('Sending file upload request');
       var streamedResponse = await request.send();
-      print('Response status: ${streamedResponse.statusCode}');
+      // print('Response status: ${streamedResponse.statusCode}');
       var response = await http.Response.fromStream(streamedResponse);
       
       if (response.statusCode == 200) {
@@ -456,7 +456,7 @@ class DirectusService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        print('Successfully fetched ${data['data']?.length ?? 0} tutors');
+        // print('Successfully fetched ${data['data']?.length ?? 0} tutors');
 
         // Debug first tutor structure
         if (data['data'] is List && data['data'].isNotEmpty) {
@@ -504,12 +504,12 @@ class DirectusService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        print('Successfully fetched ${data['data']?.length ?? 0} courses');
+        // print('Successfully fetched ${data['data']?.length ?? 0} courses');
 
         // Debug first course structure
         if (data['data'] is List && data['data'].isNotEmpty) {
           var firstCourse = data['data'][0];
-          print('First course sample: ${firstCourse['title']}');
+          // print('First course sample: ${firstCourse['title']}');
 
           // Debug the tutor_id relationship
           if (firstCourse['tutor_id'] != null) {
@@ -601,7 +601,7 @@ class DirectusService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        print('Successfully fetched ${data['data']?.length ?? 0} subjects');
+        // print('Successfully fetched ${data['data']?.length ?? 0} subjects');
         return {'success': true, 'data': data['data']};
       } else {
         print('Error fetching subjects: ${data['errors'] != null ? data['errors'][0]['message'] : 'Unknown error'}');
@@ -869,7 +869,7 @@ class DirectusService {
           }
         }
       }
-      print(userData);
+      // print(userData);
       // Return the processed user data
       return {
         'success': true,
@@ -1087,7 +1087,7 @@ class DirectusService {
         '$baseUrl/items/Courses?filter[tutor_id][_eq]=$tutorId&fields=$fields',
       );
 
-      print('Fetching courses by Tutor ID: $tutorId from URL: $url');
+      // print('Fetching courses by Tutor ID: $tutorId from URL: $url');
 
       final response = await http.get(
         url,
@@ -1100,30 +1100,30 @@ class DirectusService {
       final data = jsonDecode(response.body); // Decode once, use for both success and error
 
       if (response.statusCode == 200) {
-        print('Successfully fetched ${data['data']?.length ?? 0} courses for Tutor ID: $tutorId');
+        // print('Successfully fetched ${data['data']?.length ?? 0} courses for Tutor ID: $tutorId');
 
         // Optional: Debug first course structure if data is present
         if (data['data'] is List && data['data'].isNotEmpty) {
           var firstCourse = data['data'][0];
-          print('First course sample for Tutor ID $tutorId: ${firstCourse['title']}');
+          // print('First course sample for Tutor ID $tutorId: ${firstCourse['title']}');
           // You can add more detailed debugging for tutor_id, subject_id, course_image here if needed
           if (firstCourse['tutor_id'] != null) {
-            print('  - Tutor ID data: ${firstCourse['tutor_id']}');
+            // print('  - Tutor ID data: ${firstCourse['tutor_id']}');
             if (firstCourse['tutor_id']['user_id'] != null) {
-              print('    - Tutor User data: ${firstCourse['tutor_id']['user_id']}');
+              // print('    - Tutor User data: ${firstCourse['tutor_id']['user_id']}');
             }
           }
           if (firstCourse['subject_id'] != null) {
-            print('  - Subject ID data: ${firstCourse['subject_id']}');
+            // print('  - Subject ID data: ${firstCourse['subject_id']}');
           }
           if (firstCourse['course_image'] != null) {
-            print('  - Course Image data: ${firstCourse['course_image']}');
+            // print('  - Course Image data: ${firstCourse['course_image']}');
           }
           if (firstCourse['bookings'] != null) { // If bookings.* was used and it's a relation
-            print('  - Bookings data: ${firstCourse['bookings']}');
+            // print('  - Bookings data: ${firstCourse['bookings']}');
           }
         } else if (data['data'] is List && data['data'].isEmpty) {
-          print('No courses found for Tutor ID: $tutorId');
+          // print('No courses found for Tutor ID: $tutorId');
         }
 
 
@@ -1136,7 +1136,7 @@ class DirectusService {
         } else if (response.body.isNotEmpty) {
           errorMessage += ' Response: ${response.body}';
         }
-        print('Error fetching courses for Tutor ID $tutorId. Status: ${response.statusCode}. Message: $errorMessage');
+        // print('Error fetching courses for Tutor ID $tutorId. Status: ${response.statusCode}. Message: $errorMessage');
         return {
           'success': false,
           'message': errorMessage,

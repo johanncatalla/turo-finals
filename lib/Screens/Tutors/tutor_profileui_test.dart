@@ -165,16 +165,16 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
       });
 
       // Debug output to help diagnose data structure issues
-      print('User data: ${userData?.runtimeType}');
-      print('Tutor profile: ${tutorProfileData}');
-      print('Subjects: ${subjectsData?.runtimeType}');
+      // print('User data: ${userData?.runtimeType}');
+      // print('Tutor profile: ${tutorProfileData}');
+      // print('Subjects: ${subjectsData?.runtimeType}');
 
     } catch (e) {
       setState(() {
         isLoading = false;
         errorMessage = 'Failed to load user data: ${e.toString()}';
       });
-      print('Error in _loadUserData: $e');
+      // print('Error in _loadUserData: $e');
     }
   }
 
@@ -345,7 +345,7 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
                   backgroundColor: Colors.grey[200],
                   backgroundImage: const AssetImage('assets/profile.png'),
                   onBackgroundImageError: (exception, stackTrace) {
-                    print('Error loading profile image: $exception');
+                    // print('Error loading profile image: $exception');
                   },
                 ),
               ),
@@ -1056,7 +1056,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> with SingleTi
             tooltip: 'Edit Course',
             onPressed: () {
               // Placeholder for Edit action
-              print('Edit course tapped');
+              // print('Edit course tapped');
               ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Edit action placeholder'))
               );
@@ -1067,7 +1067,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> with SingleTi
             tooltip: 'Delete Course',
             onPressed: () {
               // Placeholder for Delete action
-              print('Delete course tapped');
+              // print('Delete course tapped');
               showDialog(
                 context: context,
                 builder: (BuildContext context) {

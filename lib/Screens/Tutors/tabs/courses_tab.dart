@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'; // Import Provider
 import 'package:turo/Screens/Tutors/tutor_createcourse.dart'; // Import Create Course screen
+import 'package:turo/providers/course_provider.dart';
 
 class CoursesTab extends StatelessWidget {
   final bool isLoading;
   final String? coursesError;
   final List<Map<String, dynamic>> courses;
-  final String? directusBaseUrl;
-  final String tutorName; // For fallback instructor name
+  final String tutorName; // Used as fallback for instructor name
   final VoidCallback onRetryFetchCourses;
-  final VoidCallback onRefreshCourses; // To call after creating a course
+  final VoidCallback onRefreshCourses;
   final Color primaryColor;
   final Color secondaryTextColor;
   final Color cardBackgroundColor;
@@ -20,7 +21,6 @@ class CoursesTab extends StatelessWidget {
     required this.isLoading,
     this.coursesError,
     required this.courses,
-    this.directusBaseUrl,
     required this.tutorName,
     required this.onRetryFetchCourses,
     required this.onRefreshCourses,
@@ -32,10 +32,11 @@ class CoursesTab extends StatelessWidget {
   });
 
   Widget _buildCourseCard({
-    required BuildContext context, // Added context for navigation if needed from card
-    String? imagePath,
-    bool isNetworkImage = false,
-    required String fallbackImageAsset,
+    required BuildContext context,
+    String? imagePath,        // Can be network URL, local asset path, or null
+    required bool isNetworkImage, // True if imagePath is a network URL
+    required bool isLocalAsset,   // True if imagePath is a direct local asset path
+    required String fallbackImageAsset, // Asset to use as the ultimate fallback
     required String title,
     required String time,
     required String instructor,
@@ -43,7 +44,8 @@ class CoursesTab extends StatelessWidget {
   }) {
     Widget imageWidget;
 
-    if (isNetworkImage && imagePath != null) {
+    if (isNetworkImage && imagePath != null && imagePath.isNotEmpty) {
+      // 1. Handle Network Image (either direct URL or from provider)
       imageWidget = Image.network(
         imagePath,
         width: 90,
@@ -67,7 +69,8 @@ class CoursesTab extends StatelessWidget {
           );
         },
         errorBuilder: (context, error, stackTrace) {
-          print("Network image error: $error for path $imagePath");
+          print("Network image error for $imagePath: $error. Using fallback.");
+          // Fallback if network image loading fails
           return Image.asset(
             fallbackImageAsset,
             width: 90,
@@ -76,25 +79,35 @@ class CoursesTab extends StatelessWidget {
           );
         },
       );
-    } else if (!isNetworkImage && imagePath != null) {
+    } else if (isLocalAsset && imagePath != null && imagePath.isNotEmpty) {
+      // 2. Handle Direct Local Asset
       imageWidget = Image.asset(
-        imagePath,
+        imagePath, // imagePath is the direct local asset path e.g., "assets/courses/python.png"
         width: 90,
         height: 90,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Image.asset(
+        errorBuilder: (context, error, stackTrace) {
+          print("Local asset error for $imagePath: $error. Using fallback.");
+          // Fallback if the specified local asset itself fails to load
+          return Image.asset(
+            fallbackImageAsset,
+            width: 90,
+            height: 90,
+            fit: BoxFit.cover,
+          );
+        },
+      );
+    } else {
+      imageWidget = Image.asset(
           fallbackImageAsset,
           width: 90,
           height: 90,
           fit: BoxFit.cover,
-        ),
-      );
-    } else {
-      imageWidget = Image.asset(
-        fallbackImageAsset,
-        width: 90,
-        height: 90,
-        fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            print("Ultimate fallback asset error for $fallbackImageAsset: $error");
+
+            return Container(width: 90, height: 90, color: Colors.grey.shade300, child: Icon(Icons.broken_image, color: Colors.grey.shade600));
+          }
       );
     }
 
@@ -197,6 +210,9 @@ class CoursesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Access CourseProvider. Ensure it's provided above this widget in the tree.
+    final courseProvider = Provider.of<CourseProvider>(context, listen: false);
+
     final createCourseButton = ElevatedButton(
       onPressed: () {
         Navigator.push(
@@ -220,12 +236,12 @@ class CoursesTab extends StatelessWidget {
         elevation: 0,
       ),
       child: const Text(
-        'Create Course',
+        'Create New Course',
         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       ),
     );
 
-    if (isLoading) {
+    if (isLoading && courses.isEmpty) {
       return const Center(
           child: Padding(
             padding: EdgeInsets.all(32.0),
@@ -236,17 +252,17 @@ class CoursesTab extends StatelessWidget {
     if (coursesError != null && courses.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('Error: $coursesError', textAlign: TextAlign.center),
-              const SizedBox(height: 20),
-              ElevatedButton(onPressed: onRetryFetchCourses, child: const Text("Retry")),
-              const SizedBox(height: 20),
-              createCourseButton,
-            ],
-          ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, color: Colors.red.shade300, size: 50),
+            const SizedBox(height: 16),
+            Text('Error loading courses: $coursesError', textAlign: TextAlign.center, style: TextStyle(color: Colors.red.shade700)),
+            const SizedBox(height: 20),
+            ElevatedButton(onPressed: onRetryFetchCourses, child: const Text("Retry")),
+            const SizedBox(height: 20),
+            createCourseButton,
+          ],
         ),
       );
     }
@@ -277,32 +293,41 @@ class CoursesTab extends StatelessWidget {
               ),
             const SizedBox(height: 24),
             createCourseButton,
+            const SizedBox(height: 30),
           ],
         ),
       );
     }
 
+    // Main content: Display list of courses
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0),
       child: Column(
         children: [
           if (coursesError != null && courses.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 12.0),
               child: Container(
-                padding: const EdgeInsets.all(8),
-                color: Colors.orange.withOpacity(0.1),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8)
+                ),
                 child: Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 18),
-                    const SizedBox(width: 8),
+                    Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 20),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         "Couldn't refresh courses: $coursesError",
-                        style: TextStyle(color: Colors.orange.shade700, fontSize: 12),
+                        style: TextStyle(color: Colors.orange.shade700, fontSize: 13),
                       ),
                     ),
-                    IconButton(icon: Icon(Icons.refresh, size: 18, color: Colors.orange.shade700), onPressed: onRetryFetchCourses)
+                    IconButton(
+                      icon: Icon(Icons.refresh, size: 20, color: Colors.orange.shade700),
+                      onPressed: onRetryFetchCourses,
+                      tooltip: "Retry",
+                    )
                   ],
                 ),
               ),
@@ -310,44 +335,59 @@ class CoursesTab extends StatelessWidget {
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 16.0),
             itemCount: courses.length,
             itemBuilder: (context, index) {
               final course = courses[index];
-              String? imageUrl;
+
               String courseTitle = course['title'] as String? ?? 'Untitled Course';
               String courseDescription = course['description'] as String? ?? 'No description available.';
               String courseDuration = course['duration'] as String? ?? "N/A";
 
-              if (course['course_image'] != null && course['course_image'] is Map) {
-                final imageObject = course['course_image'] as Map<String, dynamic>;
-                final imageId = imageObject['id'] as String?;
-                if (imageId != null && directusBaseUrl != null) {
-                  imageUrl = '$directusBaseUrl/assets/$imageId';
-                }
-              }
+              String? imageIdentifier = course['image'] as String?; // Can be "assets/...", a full URL, an ID, or null
+              String? finalImagePath;       // Will hold the determined path or URL for the image
+              bool isDeterminedAsNetworkImage = false;
+              bool isDeterminedAsLocalAsset = false;
 
-              String instructor = tutorName; // Fallback
-              if (course['tutor_id'] != null && course['tutor_id'] is Map) {
-                final tutorObject = course['tutor_id'] as Map<String, dynamic>;
-                if (tutorObject['user_id'] != null && tutorObject['user_id'] is Map) {
-                  final userObject = tutorObject['user_id'] as Map<String, dynamic>;
-                  String? firstName = userObject['first_name'] as String?;
-                  String? lastName = userObject['last_name'] as String?;
-                  if (firstName != null && firstName.isNotEmpty && lastName != null && lastName.isNotEmpty) {
-                    instructor = '$firstName $lastName';
-                  } else if (firstName != null && firstName.isNotEmpty) {
-                    instructor = firstName;
+
+              if (imageIdentifier != null && imageIdentifier.isNotEmpty) {
+                if (imageIdentifier.startsWith('assets/')) {
+
+                  finalImagePath = imageIdentifier;
+                  isDeterminedAsLocalAsset = true;
+
+                } else if (Uri.tryParse(imageIdentifier)?.isAbsolute ?? false) {
+
+                  finalImagePath = imageIdentifier;
+                  isDeterminedAsNetworkImage = true;
+
+                } else {
+
+                  finalImagePath = courseProvider.getAssetUrl(imageIdentifier);
+                  if (finalImagePath != null && finalImagePath.isNotEmpty) {
+                    isDeterminedAsNetworkImage = true; // Resolved to a network URL
+
+                  } else {
+
+                    print("Warning: CourseProvider.getAssetUrl returned null or empty for ID: '$imageIdentifier'. Fallback will be used.");
                   }
                 }
+              } else {
+
               }
+
+              String instructor = course['instructorName'] as String? ?? tutorName;
+
+              String fallbackAsset = 'assets/courses/python.png'; // Your example fallback
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 16.0),
                 child: _buildCourseCard(
                   context: context,
-                  imagePath: imageUrl,
-                  isNetworkImage: imageUrl != null,
-                  fallbackImageAsset: 'assets/English.png', // Ensure this asset exists
+                  imagePath: finalImagePath,
+                  isNetworkImage: isDeterminedAsNetworkImage,
+                  isLocalAsset: isDeterminedAsLocalAsset,
+                  fallbackImageAsset: fallbackAsset,
                   title: courseTitle,
                   time: courseDuration,
                   instructor: instructor,
@@ -356,8 +396,10 @@ class CoursesTab extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 24),
-          createCourseButton,
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0), // Padding for the button
+            child: createCourseButton,
+          ),
         ],
       ),
     );

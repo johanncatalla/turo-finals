@@ -107,7 +107,7 @@ class ModulesTab extends StatelessWidget {
                 ),
               );
               */
-              print("Create Module button tapped");
+              // print("Create Module button tapped");
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor.withOpacity(0.1),

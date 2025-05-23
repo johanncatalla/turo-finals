@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:turo/providers/auth_provider.dart';
+import 'package:turo/providers/course_provider.dart'; // Import CourseProvider
 import 'package:turo/role_select.dart';
 import 'package:turo/Screens/Tutors/tutor_profileui_test.dart';
-
-// Import DirectusService and dotenv
-import 'package:turo/services/directus_service.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // Import the new tab widgets
 import 'package:turo/screens/Tutors/tabs/dashboard_tab.dart';
@@ -14,8 +12,6 @@ import 'package:turo/screens/Tutors/tabs/courses_tab.dart';
 import 'package:turo/screens/Tutors/tabs/modules_tab.dart';
 import 'package:turo/screens/Tutors/tabs/videos_tab.dart';
 import 'package:turo/screens/Tutors/tabs/reviews_tab.dart';
-
-// import 'package:turo/Screens/Tutors/tutokfeed.dart'; // Placeholder
 
 class TutorHomepage extends StatefulWidget {
   const TutorHomepage({super.key});
@@ -26,8 +22,7 @@ class TutorHomepage extends StatefulWidget {
 
 class _TutorHomepageState extends State<TutorHomepage>
     with TickerProviderStateMixin {
-  String _tutorName = "Tutor";
-  String? _tutorId;
+  // String _tutorName = "Tutor"; // Will get from AuthProvider
   late TabController _tabController;
   int _currentTabIndex = 0;
   int _bottomNavIndex = 0;
@@ -40,17 +35,18 @@ class _TutorHomepageState extends State<TutorHomepage>
   final Color _floatingNavBackground = Colors.black87;
   final Color _floatingNavIconColor = Colors.grey.shade400;
 
-  late DirectusService _directusService;
-  List<Map<String, dynamic>> _courses = [];
-  bool _isLoadingCourses = true;
-  String? _coursesError;
-  String? _directusBaseUrl;
+  // Removed local course state, will use CourseProvider
+  // late DirectusService _directusService; // Not needed directly for courses anymore
+  // List<Map<String, dynamic>> _courses = [];
+  // bool _isLoadingCourses = true;
+  // String? _coursesError;
+  // String? _directusBaseUrl; // Will get from CourseProvider
 
   @override
   void initState() {
     super.initState();
-    _directusService = DirectusService();
-    _directusBaseUrl = dotenv.env['BASE_URL'];
+    // _directusService = DirectusService(); // Not needed directly for courses
+    // _directusBaseUrl = dotenv.env['DIRECTUS_API_URL']; // Get from CourseProvider
 
     _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(() {
@@ -58,12 +54,12 @@ class _TutorHomepageState extends State<TutorHomepage>
         setState(() {
           _currentTabIndex = _tabController.index;
         });
-        if (_currentTabIndex == 1 && (_courses.isEmpty || _coursesError != null) && !_isLoadingCourses) {
-          _fetchTutorCourses();
-        }
+        // No need to manually fetch courses here, CourseProvider handles it.
+        // We might want to refresh if the tab becomes active and data is stale,
+        // but CourseProvider's initialize should handle initial load.
       }
     });
-    _loadUserDataAndFetchInitialCourses();
+    _initializeProvidersAndUserData();
     _bottomNavIndex = 0;
   }
 
@@ -73,120 +69,45 @@ class _TutorHomepageState extends State<TutorHomepage>
     super.dispose();
   }
 
-  void _loadUserDataAndFetchInitialCourses() {
+  void _initializeProvidersAndUserData() {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final courseProvider = Provider.of<CourseProvider>(context, listen: false);
+
       if (authProvider.user == null) {
-        print("User data not available in AuthProvider (not logged in).");
-        if (mounted) {
-          setState(() {
-            _tutorName = "Tutor";
-            _isLoadingCourses = false;
-            _coursesError = "User not logged in. Please log in to view courses.";
-            _tutorId = null;
-          });
-        }
+        // User not logged in, AuthProvider should handle this state
+        // print("User data not available in AuthProvider (not logged in).");
         return;
       }
 
-      if (mounted) {
-        setState(() {
-          _tutorName = authProvider.user!.fullName ?? "Tutor";
-        });
-      }
-
-      print("Fetching tutor profile...");
-      final profileResponse = await _directusService.fetchTutorProfile();
-      String? newTutorId;
-
-      if (profileResponse['success'] == true && profileResponse['data'] != null) {
-        final userData = profileResponse['data'];
-        try {
-          if (userData['tutor_profile'] != null &&
-              userData['tutor_profile'] is List &&
-              (userData['tutor_profile'] as List).isNotEmpty) {
-            final tutorProfileData = userData['tutor_profile'][0];
-            if (tutorProfileData != null && tutorProfileData['id'] != null) {
-              newTutorId = tutorProfileData['id'].toString();
-              print("Successfully fetched Tutor ID from profile: $newTutorId");
-            }
-          }
-        } catch (e) {
-          print("Error parsing tutor profile data: $e");
-        }
+      // Ensure CourseProvider is initialized.
+      // If courses are empty and not loading, and instructors are loaded, just fetch courses.
+      // If instructors are also not loaded, do a full initialize.
+      // This logic can be refined based on when/how often you want to re-fetch.
+      if (courseProvider.courses.isEmpty && !courseProvider.isLoading && courseProvider.instructors.isNotEmpty) {
+        // print("TutorHomepage: Instructors loaded, courses empty. Fetching courses.");
+        await courseProvider.fetchCourses();
+      } else if (courseProvider.instructors.isEmpty && !courseProvider.isLoading) {
+        // print("TutorHomepage: CourseProvider not fully initialized. Initializing now.");
+        await courseProvider.initialize();
       } else {
-        print("Failed to fetch tutor profile: ${profileResponse['message'] ?? 'Unknown error'}");
-        if (mounted) {
-          setState(() {
-            _isLoadingCourses = false;
-            _coursesError = "Could not load tutor profile details. ${profileResponse['message'] ?? ''}";
-            _tutorId = null;
-          });
-        }
-        return;
+        // print("TutorHomepage: CourseProvider seems initialized or is loading.");
       }
-
-      if (newTutorId == null) {
-        print("Tutor ID could not be determined from profile. Cannot load courses.");
-        if (mounted) {
-          setState(() {
-            _isLoadingCourses = false;
-            _coursesError = "Tutor ID not found in profile data. Cannot load courses.";
-            _tutorId = null;
-          });
-        }
-        return;
-      }
-
-      if (mounted) {
-        setState(() {
-          _tutorId = newTutorId;
-          print('This is the tutor ID in use now: $_tutorId');
-        });
-      }
-
-      if (_tutorId != null) {
-        if (_currentTabIndex == 1 || _courses.isEmpty) {
-          _fetchTutorCourses();
-        } else {
-          if (mounted) setState(() => _isLoadingCourses = false);
-        }
-      }
+      // No need to call _fetchTutorCourses anymore.
+      // setState will be triggered by Provider listeners when data changes.
     });
   }
 
-  Future<void> _fetchTutorCourses() async {
-    if (_tutorId == null) {
-      if (mounted) {
-        setState(() {
-          _coursesError = "Tutor ID is not available to fetch courses.";
-          _isLoadingCourses = false;
-        });
-      }
-      return;
-    }
+  // Removed _fetchTutorCourses, as CourseProvider will handle this.
+  // Future<void> _fetchTutorCourses() async { ... }
 
-    if (mounted) {
-      setState(() {
-        _isLoadingCourses = true;
-        _coursesError = null;
-      });
-    }
-
-    final result = await _directusService.fetchCoursesByTutorId(_tutorId!);
-
-    if (mounted) {
-      setState(() {
-        if (result['success']) {
-          _courses = List<Map<String, dynamic>>.from(result['data']);
-          if (_courses.isEmpty) _coursesError = "No courses found.";
-        } else {
-          _coursesError = result['message'] ?? "An unknown error occurred while fetching courses.";
-        }
-        _isLoadingCourses = false;
-      });
-    }
+  void _refreshCourseData() {
+    // This can be called to explicitly refresh data from CourseProvider
+    final courseProvider = Provider.of<CourseProvider>(context, listen: false);
+    // print("TutorHomepage: Refreshing course data via CourseProvider.initialize()");
+    courseProvider.initialize(); // Or just .fetchCourses() if only courses need refresh
   }
+
 
   void _navigateToProfile() {
     Navigator.push(
@@ -194,11 +115,11 @@ class _TutorHomepageState extends State<TutorHomepage>
       MaterialPageRoute(builder: (context) => const TutorProfileScreen()),
     ).then((_) {
       if (mounted) {
-        // Reset to home icon on nav bar or handle as needed
         if (_bottomNavIndex != 0) {
           setState(() => _bottomNavIndex = 0);
         }
-        _loadUserDataAndFetchInitialCourses();
+        // Optionally, refresh data if profile changes might affect displayed info
+        _initializeProvidersAndUserData();
       }
     });
   }
@@ -226,6 +147,8 @@ class _TutorHomepageState extends State<TutorHomepage>
     if (shouldLogout && mounted) {
       await authProvider.logout();
       if (!mounted) return;
+      // Clear CourseProvider data on logout if necessary, or let it re-initialize on next login
+      // Provider.of<CourseProvider>(context, listen: false).clearData(); // Example method
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
             (route) => false,
@@ -235,28 +158,83 @@ class _TutorHomepageState extends State<TutorHomepage>
 
   @override
   Widget build(BuildContext context) {
+    // Get providers
+    final authProvider = Provider.of<AuthProvider>(context);
+    final courseProvider = Provider.of<CourseProvider>(context);
+
+    // Get tutor name from AuthProvider
+    final String tutorName = authProvider.user?.fullName ?? "Tutor";
+    final String? currentUserId = authProvider.user?.id;
+
+    // Filter courses from CourseProvider
+    List<Map<String, dynamic>> tutorSpecificCourses = [];
+    if (authProvider.status == AuthStatus.authenticated && currentUserId != null) {
+      tutorSpecificCourses = courseProvider.courses.where((course) {
+        // 'tutorUserId' is populated in CourseProvider._mapDirectusCoursesToCourses
+        return course['tutorUserId'] == currentUserId;
+      }).toList();
+      print("TutorHomepage: Filtered ${tutorSpecificCourses.length} courses for tutor ID $currentUserId");
+    } else {
+      print("TutorHomepage: User not authenticated or ID null, no courses to filter.");
+    }
+
+    // Get Directus base URL from CourseProvider (which gets it from DirectusService)
+    final String? directusBaseUrl = dotenv.env['DIRECTUS_API_URL'];
+    // print(directusBaseUrl);
+
+    if (authProvider.status == AuthStatus.unknown) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (authProvider.status == AuthStatus.unauthenticated) {
+      // This case should ideally lead to a login screen, but for safety:
+      return Scaffold(
+        appBar: AppBar(title: const Text("Tutor Home")),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text("Please log in to continue."),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
+                      (route) => false,
+                ),
+                child: const Text("Go to Login"),
+              )
+            ],
+          ),
+        ),
+      );
+    }
+
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: null,
-      body: SafeArea( // SafeArea now wraps the body
+      body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildWelcomeHeader(),
+              _buildWelcomeHeader(tutorName), // Pass tutorName
               _buildHeroBanner(),
               _buildTabBar(),
-              _buildTabContent(),
-              // No SizedBox needed here for nav bar space, Scaffold handles it
+              _buildTabContent(
+                isLoading: courseProvider.isLoading, // From CourseProvider
+                coursesError: courseProvider.error, // From CourseProvider
+                courses: tutorSpecificCourses, // Filtered list
+                directusBaseUrl: directusBaseUrl, // From CourseProvider
+                tutorName: tutorName, // From AuthProvider
+              ),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNavBar(), // Assigning the new nav bar here
+      bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 
-  Widget _buildWelcomeHeader() {
+  Widget _buildWelcomeHeader(String name) { // Accept name as parameter
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
       child: Row(
@@ -278,7 +256,7 @@ class _TutorHomepageState extends State<TutorHomepage>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _tutorName,
+                  name, // Use passed name
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -352,7 +330,13 @@ class _TutorHomepageState extends State<TutorHomepage>
     );
   }
 
-  Widget _buildTabContent() {
+  Widget _buildTabContent({
+    required bool isLoading,
+    required String? coursesError,
+    required List<Map<String, dynamic>> courses,
+    required String? directusBaseUrl,
+    required String tutorName,
+  }) {
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),
       child: Container(
@@ -370,13 +354,13 @@ class _TutorHomepageState extends State<TutorHomepage>
                 );
               case 1:
                 return CoursesTab(
-                  isLoading: _isLoadingCourses,
-                  coursesError: _coursesError,
-                  courses: _courses,
-                  directusBaseUrl: _directusBaseUrl,
-                  tutorName: _tutorName,
-                  onRetryFetchCourses: _fetchTutorCourses,
-                  onRefreshCourses: _fetchTutorCourses,
+                  isLoading: isLoading, // Pass from params
+                  coursesError: coursesError, // Pass from params
+                  courses: courses, // Pass from params (filtered list)
+                  // directusBaseUrl: directusBaseUrl, // Pass from params
+                  tutorName: tutorName, // Pass from params
+                  onRetryFetchCourses: _refreshCourseData, // Use new refresh method
+                  onRefreshCourses: _refreshCourseData, // Use new refresh method
                   primaryColor: _primaryColor,
                   secondaryTextColor: _secondaryTextColor,
                   cardBackgroundColor: _cardBackgroundColor,
@@ -415,19 +399,16 @@ class _TutorHomepageState extends State<TutorHomepage>
     );
   }
 
-  // MODIFIED: This is now the bottom navigation bar builder
   Widget _buildBottomNavBar() {
-    // This outer Container provides padding for the "floating" effect and safe area adjustment
     return Container(
-      color: Colors.transparent, // Allows scaffold background to show through the "margins"
+      color: Colors.transparent,
       padding: EdgeInsets.only(
         left: 80.0,
         right: 80.0,
-        top: 10.0, // Space above the nav bar
-        bottom: MediaQuery.of(context).padding.bottom + 10.0, // Space below, respecting safe area + a little gap
+        top: 10.0,
+        bottom: MediaQuery.of(context).padding.bottom + 10.0,
       ),
       child: Container(
-        // This is the actual visible navigation bar
         padding: const EdgeInsets.symmetric(vertical: 8.0),
         decoration: BoxDecoration(
           color: _floatingNavBackground,
@@ -445,7 +426,7 @@ class _TutorHomepageState extends State<TutorHomepage>
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _buildNavItem(index: 0, icon: Icons.home_filled),
-            _buildNavItem(index: 1, icon: Icons.video_library), // Placeholder for Tutok
+            _buildNavItem(index: 1, icon: Icons.video_library),
             _buildNavItem(index: 2, icon: Icons.person_outline),
           ],
         ),
@@ -459,49 +440,24 @@ class _TutorHomepageState extends State<TutorHomepage>
     return InkWell(
       onTap: () {
         if (_bottomNavIndex == index && index == 2) {
-          // If already on profile and profile icon is tapped again, do nothing or refresh
-          print("Profile Nav Tapped again, already on profile or navigated from it.");
           return;
         }
-
-        // If tapping the current active icon (excluding profile which is handled above)
-        // and it's not the profile nav that leads to a new page
         if (_bottomNavIndex == index && index != 2) {
-          print("Nav item $index tapped, already selected.");
-          // You might want to scroll to top or perform another action
           return;
         }
-
         setState(() {
           _bottomNavIndex = index;
         });
 
         if (index == 0) {
-          print("Home Nav Tapped");
-          // If "Home" should also reset the top tabs to Dashboard:
-          // if (_tabController.index != 0) {
-          //   _tabController.animateTo(0);
-          // }
+          // Home
         } else if (index == 1) {
-          print("Video/TutokFeed Nav Tapped - Placeholder");
-          // TODO: Navigate to TutokFeed screen when available
-          /*
-          Navigator.push(
-             context,
-             MaterialPageRoute(builder: (context) => const TutokFeed()), // Ensure TutokFeed exists
-           ).then((_) {
-               if (mounted) {
-                  // When returning from TutokFeed, set Home as active or last active tab
-                  setState(() => _bottomNavIndex = 0);
-               }
-           });
-           */
+          // Video/TutokFeed - Placeholder
         } else if (index == 2) {
-          print("Profile Nav Tapped");
-          _navigateToProfile(); // This will navigate and then reset _bottomNavIndex to 0 on return via .then()
+          _navigateToProfile();
         }
       },
-      borderRadius: BorderRadius.circular(20), // For ink splash effect
+      borderRadius: BorderRadius.circular(20),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 5.0),
         child: Column(
