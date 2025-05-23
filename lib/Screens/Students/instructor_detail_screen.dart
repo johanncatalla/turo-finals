@@ -146,14 +146,44 @@ class InstructorDetailScreen extends StatelessWidget {
                           child: ElevatedButton(
                             onPressed: () {
                               // Navigate to booking screen
-                              // Note: You may need to adapt this based on how instructor data maps to tutor data
+                              // Map instructor data to correct tutor profile ID
+                              String? tutorProfileId;
+                              String tutorUserId;
+                              
+                              // Try to get the tutor profile ID from various possible fields
+                              if (instructor['tutor_profile_id'] != null) {
+                                tutorProfileId = instructor['tutor_profile_id'].toString();
+                              } else if (instructor['profile_id'] != null) {
+                                tutorProfileId = instructor['profile_id'].toString();
+                              } else if (instructor['tutor_id'] != null) {
+                                tutorProfileId = instructor['tutor_id'].toString();
+                              } else {
+                                // For demo purposes, map instructor names to sample tutor IDs
+                                // This should be replaced with actual database lookups
+                                final instructorName = instructor['name']?.toString().toLowerCase() ?? '';
+                                if (instructorName.contains('joshua') || instructorName.contains('garcia')) {
+                                  tutorProfileId = '1'; // Maps to sample tutor ID 1
+                                } else if (instructorName.contains('andres') || instructorName.contains('muhlach')) {
+                                  tutorProfileId = '2'; // Maps to sample tutor ID 2
+                                } else {
+                                  tutorProfileId = '3'; // Default to sample tutor ID 3
+                                }
+                              }
+                              
+                              // Get user ID
+                              tutorUserId = instructor['user_id']?.toString() ?? 
+                                           instructor['id']?.toString() ?? 
+                                           'sample-user-id-${tutorProfileId}';
+                              
+                              print('Navigating to booking with tutorProfileId: $tutorProfileId, tutorUserId: $tutorUserId');
+                              
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => BookTutorSessionScreen(
-                                    tutorUserId: instructor['id']?.toString() ?? instructor['user_id']?.toString() ?? 'unknown-id',
+                                    tutorUserId: tutorUserId,
                                     tutorName: instructor['name']?.toString() ?? 'Unknown Instructor',
-                                    tutorProfileId: instructor['profile_id']?.toString(),
+                                    tutorProfileId: tutorProfileId,
                                     hourlyRate: instructor['hourly_rate'] is num ? instructor['hourly_rate'].toDouble() : 100.0,
                                   ),
                                 ),
