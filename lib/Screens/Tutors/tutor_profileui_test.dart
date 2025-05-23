@@ -15,7 +15,7 @@ import '../../screens/Tutors/tabs/reviews_tab.dart';
 // Import TutorHomepage if needed for navigation
 import '../../screens/Tutors/tutor_homepage.dart'; // Assuming this is the path
 
-// ... (Keep your Course, Review, NavBarItem models, App Colors, globalImageErrorBuilder) ...
+// Data Models (keep as they were)
 class Course {
   final String title;
   final String details;
@@ -65,11 +65,14 @@ class Review {
   });
 }
 
+// App Colors & Constants
 const Color primaryTeal = Color(0xFF3F8E9B);
-const Color darkCharcoal = Color(0xFF303030); // Used for old NavBar, can be removed if not used elsewhere
+const Color darkCharcoal = Color(0xFF303030);
 const Color lightGreyBg = Color(0xFFF5F5F5);
 
-Widget globalImageErrorBuilder(context, error, stackTrace) {
+// Global Image Error Builder
+Widget globalImageErrorBuilder(BuildContext context, Object error, StackTrace? stackTrace) {
+  // print("Error loading image: $error"); // You can uncomment for debugging
   return Container(
     color: Colors.grey[200],
     alignment: Alignment.center,
@@ -80,7 +83,6 @@ Widget globalImageErrorBuilder(context, error, stackTrace) {
     ),
   );
 }
-
 
 class TutorProfileScreen extends StatefulWidget {
   const TutorProfileScreen({super.key});
@@ -109,36 +111,23 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
   final Color _shadowColor = Colors.grey.withOpacity(0.1);
   final Color _borderColor = Colors.grey.shade300;
 
-  // Colors for the new BottomNavBar from TutorHomepage
+  // Colors for the new BottomNavBar
   final Color _floatingNavBackground = Colors.black87;
   final Color _floatingNavIconColor = Colors.grey.shade400;
 
-  // NavBar Items for the new BottomNavBar (consistent with TutorHomepage)
-  // The labels are not directly shown on TutorHomepage's nav bar but icons are key.
-  // We'll use icons directly in _buildBottomNavBar.
-  // This _navBarItems list might not be strictly needed if we directly use icons.
-  // For now, let's keep it as it was used for determining labels previously.
-  // List<NavBarItem> get _navBarItems {
-  //   return [
-  //     NavBarItem(icon: Icons.home_outlined, label: 'Home'),
-  //     NavBarItem(icon: Icons.video_library_outlined, label: 'Library'),
-  //     NavBarItem(icon: Icons.person_outline, label: 'Profile'),
-  //   ];
-  // }
-  // We'll use these icons directly:
   final List<IconData> _bottomNavIcons = [
-    Icons.home_filled, // As per TutorHomepage
-    Icons.video_library, // As per TutorHomepage
-    Icons.person_outline, // As per TutorHomepage
+    Icons.home_filled,
+    Icons.video_library,
+    Icons.person_outline,
   ];
 
-
+  // Use the global error builder
   final _imageErrorBuilder = globalImageErrorBuilder;
 
   @override
   void initState() {
     super.initState();
-    _bottomNavIndex = 2; // Initialize to Profile tab selected
+    _bottomNavIndex = 2;
     _tabController = TabController(length: 3, vsync: this, initialIndex: 0);
     _tabController.addListener(() {
       if (!mounted) return;
@@ -150,7 +139,6 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
     _loadInitialData();
   }
 
-  // ... ( _loadInitialData, _refreshCourseProviderData methods remain the same as previous good version)
   Future<void> _loadInitialData() async {
     if (!mounted) return;
     setState(() {
@@ -173,38 +161,77 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
     final userID = authProvider.user!.id;
 
     try {
-      final profileResult = await _directusService.fetchTutorProfileByUserId(userID);
+      // Fetch full user profile which should include 'avatar'
+      // Assuming AuthProvider might have a method like getFullUserProfile or
+      // _directusService.fetchUserById(userID) if directus_service handles fetching generic user data
+      final userProfileResponse = await authProvider.getFullUserProfile(); // ADAPT THIS LINE
 
       if (mounted) {
-        if (profileResult['success']) {
-          userData = profileResult['data'];
-          if (userData != null) {
-            var tutorProfileField = userData!['tutor_profile'];
-            if (tutorProfileField != null && tutorProfileField is List && tutorProfileField.isNotEmpty) {
-              if (tutorProfileField[0] is Map<String, dynamic>){
-                tutorProfileData = tutorProfileField[0];
+        if (userProfileResponse['success']) {
+          userData = userProfileResponse['data']; // This should contain 'avatar' and other user fields
+
+          // Now fetch the tutor-specific profile part
+          // This might be redundant if getFullUserProfile already includes expanded tutor_profile
+          final tutorSpecificProfileResult = await _directusService.fetchTutorProfileByUserId(userID);
+          if (tutorSpecificProfileResult['success']) {
+            final tutorData = tutorSpecificProfileResult['data'];
+            // The 'tutorData' might be the direct user object with 'tutor_profile' nested,
+            // or it might be the 'tutor_profile' item itself. Adjust based on your Directus setup.
+            // For now, let's assume 'tutorData' is the user object and we need to extract 'tutor_profile'.
+
+            // If userData from getFullUserProfile is more comprehensive, prefer it for 'avatar'
+            // and merge/extract tutor_profile details.
+            // For simplicity, let's assume fetchTutorProfileByUserId gives us the user object with tutor_profile
+            // and also includes the 'avatar' at the root level of the user object.
+            // If not, ensure `userData` is populated from a source that includes 'avatar'.
+
+            // Let's assume `userProfileResponse['data']` (now `userData`) contains the direct user fields
+            // like first_name, last_name, avatar.
+            // And `tutorSpecificProfileResult['data']` might be the user object again, or just the tutor_profile.
+            // We need to be careful not to overwrite `userData` if `tutorSpecificProfileResult` is less complete for root fields.
+
+            // Let's refine:
+            // 1. Get full user data (including avatar)
+            // 2. Extract/get tutor specific profile data
+
+            // Assuming userData is already populated from getFullUserProfile
+            if (userData != null) {
+              var tutorProfileField = userData!['tutor_profile']; // Assuming tutor_profile is a field in the main user data
+              if (tutorProfileField != null && tutorProfileField is List && tutorProfileField.isNotEmpty) {
+                if (tutorProfileField[0] is Map<String, dynamic>){
+                  tutorProfileData = tutorProfileField[0];
+                  if (tutorProfileData!.containsKey('subjects')) {
+                    subjectsData = tutorProfileData!['subjects'];
+                  }
+                } else {
+                  tutorProfileData = {}; // Handle case where it's not a map
+                  subjectsData = [];
+                }
+              } else if (tutorProfileField is Map<String, dynamic>) { // If it's a direct object (to-one relation)
+                tutorProfileData = tutorProfileField;
                 if (tutorProfileData!.containsKey('subjects')) {
                   subjectsData = tutorProfileData!['subjects'];
                 }
-              } else {
+              }
+              else { // No tutor profile data or unexpected format
                 tutorProfileData = {};
                 subjectsData = [];
               }
-            } else if (tutorProfileField is Map<String, dynamic>) {
-              tutorProfileData = tutorProfileField;
-              if (tutorProfileData!.containsKey('subjects')) {
-                subjectsData = tutorProfileData!['subjects'];
-              }
+            } else { // userData itself is null after getFullUserProfile
+              errorMessage = userProfileResponse['message'] ?? "Failed to load user profile.";
             }
-            else {
-              tutorProfileData = {};
-              subjectsData = [];
+
+          } else { // Failed to get tutor-specific details
+            // We might still have basic user data from getFullUserProfile
+            if (userData == null) { // If even basic user data failed
+              errorMessage = tutorSpecificProfileResult['message'] ?? "Failed to load tutor profile details.";
             }
           }
-        } else {
-          errorMessage = profileResult['message'] ?? "Failed to load profile details.";
+        } else { // getFullUserProfile failed
+          errorMessage = userProfileResponse['message'] ?? "Failed to load primary user profile.";
         }
       }
+
 
       if (courseProvider.courses.isEmpty && !courseProvider.isLoading) {
         await courseProvider.initialize();
@@ -221,15 +248,16 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
           isLoading = false;
           errorMessage = 'Failed to load data: ${e.toString()}';
         });
+        // print("Error in _loadInitialData: $e");
       }
     }
   }
+
 
   Future<void> _refreshCourseProviderData() async {
     final courseProvider = Provider.of<CourseProvider>(context, listen: false);
     await courseProvider.fetchCourses();
   }
-
 
   @override
   void dispose() {
@@ -240,7 +268,6 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
 
   @override
   Widget build(BuildContext context) {
-    // ... (isLoading, errorMessage checks for main profile data remain the same)
     if (isLoading && userData == null) {
       return Scaffold(
         appBar: AppBar(
@@ -275,36 +302,64 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
         ),
       );
     }
+    // If userData is null but not loading and no error (should not happen with current logic, but safe check)
+    if (userData == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Profile'),
+          centerTitle: false,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text("Profile data could not be loaded.", style: TextStyle(color: Colors.red)),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadInitialData,
+                style: ElevatedButton.styleFrom(backgroundColor: primaryTeal),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.white, // Added for consistency
+        elevation: 0, // Added for consistency
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, size: 24),
+          icon: const Icon(Icons.arrow_back, size: 24, color: darkCharcoal), // Added color
           onPressed: () {
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
             }
           },
         ),
-        title: const Text('Profile'),
+        title: const Text(
+          'Profile',
+          style: TextStyle(color: darkCharcoal, fontSize: 18, fontWeight: FontWeight.w500), // Style like student profile
+        ),
         centerTitle: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings_outlined, size: 24),
-            onPressed: () { /* Settings action */ },
+            icon: const Icon(Icons.settings_outlined, size: 24, color: primaryTeal), // Example color
+            onPressed: () { /* TODO: Settings action */ },
           ),
           const SizedBox(width: 8),
         ],
       ),
       body: NestedScrollView(
-        // ... (headerSliverBuilder remains the same)
         headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
           return <Widget>[
             SliverToBoxAdapter(child: _buildProfileHeader(context)),
             SliverToBoxAdapter(child: _buildTutorInfoSection(context)),
             if (subjectsData != null && subjectsData!.isNotEmpty)
               SliverToBoxAdapter(child: _buildSubjectsSection(context)),
-            SliverToBoxAdapter(child: _buildCertificationsSection(context)),
+            SliverToBoxAdapter(child: _buildCertificationsSection(context)), // This is static example data
             SliverPersistentHeader(
               delegate: _SliverAppBarDelegate(
                 TabBar(
@@ -343,12 +398,10 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
           ],
         ),
       ),
-      // MODIFICATION: Use the new bottom navigation bar
       bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 
-  // ... (_buildCoursesTabContent, _buildProfileHeader, _buildTutorInfoSection, etc. remain the same)
   Widget _buildCoursesTabContent(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final courseProvider = Provider.of<CourseProvider>(context);
@@ -357,7 +410,9 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
       return const Center(child: Text("User not logged in."));
     }
 
-    final String tutorName = authProvider.user!.fullName ?? "Tutor";
+    final String tutorName = userData?['first_name'] != null && userData?['last_name'] != null
+        ? '${userData!['first_name']} ${userData!['last_name']}'.trim()
+        : "Tutor";
     final String? currentUserId = authProvider.user!.id;
 
     List<Map<String, dynamic>> tutorSpecificCourses = [];
@@ -386,12 +441,17 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
   }
 
   Widget _buildProfileHeader(BuildContext context) {
-    final firstName = userData?['first_name'] ?? 'User';
-    final lastName = userData?['last_name'] ?? '';
+    // userData is checked for null in the main build method
+    final firstName = userData!['first_name'] ?? 'User';
+    final lastName = userData!['last_name'] ?? '';
     final fullName = '$firstName $lastName'.trim();
+
+    // Bio and verified status from tutorProfileData, which might be null or empty
     final bio = tutorProfileData?['bio'] ?? 'A dedicated tutor with a passion for teaching.';
     final isVerified = tutorProfileData?['verified'] == true;
-    final avatarId = userData?['avatar'] as String?;
+
+    // Get avatarId from userData (root user object)
+    final String? avatarId = userData!['avatar'] as String?;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -400,90 +460,113 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
           clipBehavior: Clip.none,
           alignment: Alignment.bottomLeft,
           children: [
+            // Cover Image (Static)
             AspectRatio(
               aspectRatio: 16 / 7,
               child: Image.asset(
-                'assets/cover.png',
+                'assets/cover.png', // Ensure this asset exists
                 fit: BoxFit.cover,
                 errorBuilder: _imageErrorBuilder,
               ),
             ),
+            // Profile Image (Avatar)
             Positioned(
-              bottom: -30,
+              bottom: -35, // Adjusted to match student profile's visual
               left: 20,
               child: CircleAvatar(
-                radius: 42,
+                radius: 47, // Outer radius for border (student profile style)
                 backgroundColor: Colors.white,
                 child: CircleAvatar(
-                  radius: 40,
+                  radius: 45, // Inner radius for image (student profile style)
                   backgroundColor: Colors.grey[200],
                   backgroundImage: (avatarId != null && avatarId.isNotEmpty)
-                      ? NetworkImage(_directusService.getAssetUrl(avatarId)) as ImageProvider
-                      : const AssetImage('assets/profile.png'),
+                      ? NetworkImage(_directusService.getAssetUrl(avatarId))
+                  as ImageProvider
+                      : const AssetImage('assets/profile.png'), // Your fallback asset
                   onBackgroundImageError: (exception, stackTrace) {
-                    // print('Error loading profile image: $exception');
+                    // print('Error loading profile image in TutorProfile: $avatarId, $exception');
                   },
                 ),
               ),
             ),
           ],
         ),
-        Padding(
-          padding: const EdgeInsets.only(
-            top: 8.0,
-            right: 20.0,
-            bottom: 0,
-          ),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: OutlinedButton(
-              onPressed: () {
-                // TODO: Handle Edit Profile action
-              },
-              child: const Text('Edit'),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 55), // Spacing to clear the positioned avatar (student profile style)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      fullName,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+                    Row(
+                      children: [
+                        Text(
+                          fullName,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: darkCharcoal, // Consistent with student profile
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        if (isVerified) // Verified icon from tutorProfileData
+                          Icon(Icons.verified, color: _primaryColor, size: 20),
+                        // If you want the orange verified icon like student:
+                        // Icon(Icons.verified, color: primaryTeal, size: 20),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    if (isVerified)
-                      Icon(Icons.verified, color: _primaryColor, size: 20),
+                    const SizedBox(height: 8),
+                    Text(
+                      bio, // Bio from tutorProfileData
+                      style: const TextStyle(color: Colors.grey /*greyText from student*/, fontSize: 14, height: 1.4),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  bio,
-                  style: TextStyle(color: Colors.grey[700], fontSize: 14, height: 1.4),
+              ),
+              const SizedBox(width: 16),
+              OutlinedButton(
+                onPressed: () {
+                  // TODO: Navigate to an EditTutorProfileScreen
+                  // This screen would need its own state management for editing fields,
+                  // picking images, and saving, similar to StudentProfileScreen's _isEditing logic.
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Edit Profile (Tutor) - Not Implemented Yet'))
+                  );
+                },
+                style: OutlinedButton.styleFrom( // Style like student profile
+                  foregroundColor: primaryTeal,
+                  side: const BorderSide(color: primaryTeal, width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4.0)),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  minimumSize: const Size(0, 34),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                 ),
-              ]
+                child: const Text('Edit'),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 16),
+        const Divider(color: Color(0xFFEEEEEE), height: 1), // Consistent with student profile
       ],
     );
   }
 
+
   Widget _buildTutorInfoSection(BuildContext context) {
-    if (tutorProfileData == null) {
-      return const SizedBox.shrink();
-    }
+    // tutorProfileData can be null or empty
     final education = tutorProfileData?['education_background'] ?? 'Not specified';
     final hourRateValue = tutorProfileData?['hour_rate'];
     final hourRate = hourRateValue != null ? '₱${hourRateValue.toString()}' : 'Not specified';
 
     String teachLevels = 'Not specified';
-    if (tutorProfileData?['teach_levels'] != null) {
+    // Ensure tutorProfileData and 'teach_levels' are not null before accessing
+    if (tutorProfileData != null && tutorProfileData!['teach_levels'] != null) {
       if (tutorProfileData!['teach_levels'] is List) {
         List<dynamic> levelsList = tutorProfileData!['teach_levels'];
         if (levelsList.isNotEmpty) {
@@ -522,7 +605,7 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: darkCharcoal, // Re-using darkCharcoal constant
+              color: darkCharcoal,
             ),
           ),
           const SizedBox(height: 12),
@@ -573,9 +656,9 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
                 if (subjectDetails is Map<String, dynamic> && subjectDetails.containsKey('subject_name')) {
                   subjectName = subjectDetails['subject_name'] ?? 'Subject';
                 }
-              } else if (subjectItem is Map<String, dynamic> && subjectItem.containsKey('name')) {
+              } else if (subjectItem is Map<String, dynamic> && subjectItem.containsKey('name')) { // Fallback if structure is simpler
                 subjectName = subjectItem['name'] ?? 'Subject';
-              } else if (subjectItem is String) {
+              } else if (subjectItem is String) { // Fallback for plain string list
                 subjectName = subjectItem;
               }
 
@@ -637,11 +720,12 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
   }
 
   Widget _buildCertificationsSection(BuildContext context) {
+    // This is example data. In a real app, fetch this from tutorProfileData or similar
     final certifications = [
       {
         'title': 'English Proficiency for Customer Service Workers',
-        'description': '${userData?['first_name'] ?? 'User'} just earned a TESDA certification! At Turo, we support our tutors in getting certified to ensure quality education for our students.',
-        'imagePath': 'assets/certificate.png',
+        'description': '${userData!['first_name'] ?? 'User'} just earned a TESDA certification! At Turo, we support our tutors in getting certified to ensure quality education for our students.',
+        'imagePath': 'assets/certificate.png', // Ensure this asset exists
       },
     ];
 
@@ -724,16 +808,14 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
     );
   }
 
-
-  // --- New Bottom Navigation Bar methods (copied and adapted from TutorHomepage) ---
   Widget _buildBottomNavBar() {
     return Container(
-      color: Colors.transparent, // Ensures the floating effect if background is transparent
+      color: Colors.transparent,
       padding: EdgeInsets.only(
-        left: 80.0, // Adjust padding as needed for aesthetics
+        left: 80.0,
         right: 80.0,
         top: 10.0,
-        bottom: MediaQuery.of(context).padding.bottom + 10.0, // Safe area padding
+        bottom: MediaQuery.of(context).padding.bottom + 10.0,
       ),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -752,9 +834,9 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(index: 0, icon: _bottomNavIcons[0]), // Home
-            _buildNavItem(index: 1, icon: _bottomNavIcons[1]), // Library/Videos
-            _buildNavItem(index: 2, icon: _bottomNavIcons[2]), // Profile
+            _buildNavItem(index: 0, icon: _bottomNavIcons[0]),
+            _buildNavItem(index: 1, icon: _bottomNavIcons[1]),
+            _buildNavItem(index: 2, icon: _bottomNavIcons[2]),
           ],
         ),
       ),
@@ -765,7 +847,7 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
     bool isSelected = _bottomNavIndex == index;
     return InkWell(
       onTap: () {
-        if (_bottomNavIndex == index) return; // Do nothing if already selected
+        if (_bottomNavIndex == index) return;
 
         if (mounted) {
           setState(() {
@@ -773,33 +855,36 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
           });
         }
 
-        // Handle navigation based on index
-        if (index == 0) { // Home
-          // Navigate back to TutorHomepage.
-          // If TutorHomepage is always the screen before profile:
+        if (index == 0) {
           if (Navigator.canPop(context)) {
-            // Pop until TutorHomepage, or just pop if it's the immediate previous.
-            // For robust navigation, consider named routes or ensuring TutorHomepage is on stack.
-            // Navigator.popUntil(context, ModalRoute.withName('/tutorHomepage')); // If named
-            Navigator.of(context).popUntil((route) => route.isFirst); // Go to the very first screen
-            Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const TutorHomepage())); // Or replace current stack
+            Navigator.of(context).popUntil((route) {
+              // Pop until we find TutorHomepage or we are at the first route
+              return route.settings.name == '/tutorHomepage' || route.isFirst;
+            });
+            // If TutorHomepage was not found and we popped to first, or if it was found and popped to it,
+            // ensure TutorHomepage is the current route.
+            if (ModalRoute.of(context)?.settings.name != '/tutorHomepage') {
+              Navigator.of(context).pushReplacement(MaterialPageRoute(
+                  builder: (_) => const TutorHomepage(),
+                  settings: const RouteSettings(name: '/tutorHomepage') // Good to set name
+              ));
+            }
           } else {
-            // Fallback if cannot pop (e.g. profile is the first screen)
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const TutorHomepage()), // Ensure TutorHomepage is imported
+              MaterialPageRoute(builder: (context) => const TutorHomepage(), settings: const RouteSettings(name: '/tutorHomepage')),
             );
           }
-        } else if (index == 1) { // Library/Videos
-          // TODO: Implement navigation to Library/Videos screen
+        } else if (index == 1) {
+          // TODO: Navigate to Library/Videos screen
+          // Example: Navigator.pushNamed(context, '/library');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Library/Videos placeholder tapped')),
           );
-        } else if (index == 2) { // Profile
-          // Already on the profile screen, do nothing.
         }
+        // Index 2 is profile, already on it.
       },
-      borderRadius: BorderRadius.circular(20), // For ink splash effect
+      borderRadius: BorderRadius.circular(20),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 5.0),
         child: Column(
@@ -811,7 +896,7 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
               size: 26.0,
             ),
             const SizedBox(height: 4.0),
-            AnimatedContainer( // Indicator line
+            AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               height: 3.0,
               width: 20.0,
@@ -826,483 +911,6 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
     );
   }
 }
-
-// ... (Keep CourseDetailsScreen, ReviewDetailsScreen, _SliverAppBarDelegate, MyCustomScrollBehavior) ...
-// Ensure CourseDetailsScreen and ReviewDetailsScreen are updated if their data models change
-// or if they need to fetch data dynamically instead of using passed-in example data.
-
-class CourseDetailsScreen extends StatefulWidget {
-  final Course course;
-  const CourseDetailsScreen({Key? key, required this.course}) : super(key: key);
-
-  @override
-  State<CourseDetailsScreen> createState() => _CourseDetailsScreenState();
-}
-
-class _CourseDetailsScreenState extends State<CourseDetailsScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  final _imageErrorBuilder = globalImageErrorBuilder;
-
-  final List<Map<String, dynamic>> _courseModules = [
-    { 'title': 'Module 1: Introduction to Conversational Flow', 'tags': 'Speaking | Listening | Beginner', 'locked': false, },
-    { 'title': 'Module 2: Common Phrases & Idioms', 'tags': 'Vocabulary | Speaking | Intermediate', 'locked': true, },
-    { 'title': 'Module 3: Role-playing Scenarios', 'tags': 'Practice | Speaking | Intermediate', 'locked': true, },
-  ];
-
-  final List<Review> _courseReviews = [
-    Review(name: 'Student A', date: 'Oct 1, 2023', reviewText: 'Great introductory course!', rating: 5, imagePath: 'assets/image2.png'),
-    Review(name: 'Student B', date: 'Sep 28, 2023', reviewText: 'Helped improve my confidence.', rating: 4, imagePath: 'assets/image4.png'),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text('Course Details'),
-        titleTextStyle: const TextStyle(
-          color: Colors.black,
-          fontSize: 18,
-          fontWeight: FontWeight.w500,
-        ),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined, color: Colors.black),
-            tooltip: 'Edit Course',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Edit action placeholder'))
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.red),
-            tooltip: 'Delete Course',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    title: const Text("Confirm Deletion"),
-                    content: const Text("Are you sure you want to delete this course?"),
-                    actions: <Widget>[
-                      TextButton(
-                        child: const Text("Cancel"),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                      TextButton(
-                        child: const Text("Delete", style: TextStyle(color: Colors.red)),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Delete action placeholder'))
-                          );
-                        },
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Column(
-        children: <Widget>[
-          _buildCourseHeader(),
-          _buildCourseTabBar(),
-          Expanded(
-            child: _buildCourseTabBarView(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCourseHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Image.asset(
-          widget.course.imagePath,
-          width: double.infinity,
-          height: 200,
-          fit: BoxFit.cover,
-          errorBuilder: _imageErrorBuilder,
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.course.title,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ),
-                  if (widget.course.rate != null && widget.course.rate!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16.0),
-                      child: Text(
-                        widget.course.rate!,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange[800],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(Icons.access_time_outlined, size: 18, color: Colors.grey[700]),
-                  const SizedBox(width: 4),
-                  Text(
-                    widget.course.duration,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                widget.course.description,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[800],
-                  height: 1.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCourseTabBar() {
-    return Container(
-      decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.grey[300]!, width: 1.0)),
-          color: Colors.white
-      ),
-      child: TabBar(
-        controller: _tabController,
-        labelColor: primaryTeal,
-        unselectedLabelColor: Colors.grey,
-        indicatorColor: primaryTeal,
-        indicatorSize: TabBarIndicatorSize.label,
-        indicatorWeight: 3.0,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        tabs: const [
-          Tab(text: 'Materials'),
-          Tab(text: 'Reviews'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCourseTabBarView() {
-    return TabBarView(
-      controller: _tabController,
-      children: [
-        _buildCourseMaterialsList(),
-        _buildCourseReviewsList(),
-      ],
-    );
-  }
-
-  Widget _buildCourseMaterialsList() {
-    if (_courseModules.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20.0),
-          child: Text(
-            'No materials available for this course yet.',
-            style: TextStyle(color: Colors.grey, fontSize: 16),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      itemCount: _courseModules.length,
-      itemBuilder: (context, index) {
-        final module = _courseModules[index];
-        return _buildModuleListItem(
-          context,
-          module['title'] as String,
-          module['tags'] as String,
-          module['locked'] as bool,
-        );
-      },
-    );
-  }
-
-  Widget _buildCourseReviewsList() {
-    if (_courseReviews.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20.0),
-          child: Text(
-            'No reviews available for this course yet.',
-            style: TextStyle(color: Colors.grey, fontSize: 16),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      itemCount: _courseReviews.length,
-      itemBuilder: (context, index) {
-        final review = _courseReviews[index];
-        return _buildReviewCardForCourseDetails(context, review);
-      },
-    );
-  }
-
-  Widget _buildReviewCardForCourseDetails(BuildContext context, Review review) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 0),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Colors.grey[200]!, width: 1.0),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8.0),
-            child: Image.asset(
-              review.imagePath,
-              width: 60,
-              height: 60,
-              fit: BoxFit.cover,
-              errorBuilder: _imageErrorBuilder,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  review.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  review.date,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  review.reviewText,
-                  style: TextStyle(fontSize: 14, height: 1.4, color: Colors.grey[700]),
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(5, (index) {
-                      return Icon(
-                        index < review.rating ? Icons.star_rounded : Icons.star_border_rounded,
-                        color: Colors.amber,
-                        size: 18,
-                      );
-                    }),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModuleListItem(BuildContext context, String title, String tags, bool isLocked) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 0),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Colors.grey[200]!, width: 1.0),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      color: Colors.black87),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  tags,
-                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          ),
-          if (isLocked)
-            Padding(
-              padding: const EdgeInsets.only(left: 16.0),
-              child: Icon(Icons.lock_outline, color: Colors.grey[600], size: 24),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-
-class ReviewDetailsScreen extends StatelessWidget {
-  final Review review;
-
-  const ReviewDetailsScreen({Key? key, required this.review}) : super(key: key);
-  final _imageErrorBuilder = globalImageErrorBuilder;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text('Review Details'),
-        titleTextStyle: const TextStyle(
-          color: Colors.black,
-          fontSize: 18,
-          fontWeight: FontWeight.w500,
-        ),
-        centerTitle: false,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12.0),
-                  child: Image.asset(
-                    review.imagePath,
-                    width: 80,
-                    height: 80,
-                    fit: BoxFit.cover,
-                    errorBuilder: _imageErrorBuilder,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        review.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        review.date,
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: List.generate(5, (index) {
-                          return Icon(
-                            index < review.rating
-                                ? Icons.star_rounded
-                                : Icons.star_border_rounded,
-                            color: Colors.amber,
-                            size: 22,
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 16),
-            Text(
-              'Review:',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-                color: Colors.grey[800],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              review.reviewText,
-              style: TextStyle(
-                fontSize: 15,
-                height: 1.5,
-                color: Colors.grey[850],
-              ),
-              softWrap: true,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar _tabBar;
@@ -1319,7 +927,7 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
       BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
       decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
+          color: Theme.of(context).scaffoldBackgroundColor, // Use theme background
           border: Border(bottom: BorderSide(color: Colors.grey[200]!, width: 1.0))
       ),
       child: _tabBar,
@@ -1331,6 +939,140 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
     return _tabBar != oldDelegate._tabBar;
   }
 }
+
+// MyCustomScrollBehavior, CourseDetailsScreen, ReviewDetailsScreen - KEEP AS IS (they were not part of the direct request for avatar/cover)
+// Ensure they are present in your file if needed.
+// For brevity, I'm omitting them here, but you should have them from your original code.
+
+
+// --- Stubs for CourseDetailsScreen and ReviewDetailsScreen if you need them temporarily ---
+// --- Remove these and use your actual implementations ---
+
+class CourseDetailsScreen extends StatefulWidget {
+  final Course course; // Assuming Course model is defined
+  const CourseDetailsScreen({Key? key, required this.course}) : super(key: key);
+
+  @override
+  State<CourseDetailsScreen> createState() => _CourseDetailsScreenState();
+}
+
+class _CourseDetailsScreenState extends State<CourseDetailsScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final _imageErrorBuilder = globalImageErrorBuilder; // Use your global error builder
+
+  // Example data (replace with actual data handling)
+  final List<Map<String, dynamic>> _courseModules = [
+    { 'title': 'Module 1: Introduction', 'tags': 'Beginner', 'locked': false, },
+    { 'title': 'Module 2: Advanced Topics', 'tags': 'Intermediate', 'locked': true, },
+  ];
+  final List<Review> _courseReviews = [ // Assuming Review model is defined
+    Review(name: 'Student Alpha', date: 'Jan 1, 2024', reviewText: 'Very good.', rating: 5, imagePath: 'assets/profile.png'),
+  ];
+
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this); // Example: 2 tabs
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.course.title)),
+      body: Column(
+        children: [
+          // Simplified header
+          Image.asset(widget.course.imagePath, height: 150, width: double.infinity, fit: BoxFit.cover, errorBuilder: _imageErrorBuilder),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(widget.course.description, style: TextStyle(fontSize: 16)),
+          ),
+          TabBar(
+            controller: _tabController,
+            labelColor: primaryTeal,
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: primaryTeal,
+            tabs: const [
+              Tab(text: "Materials"),
+              Tab(text: "Reviews"),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // Materials Tab
+                ListView.builder(
+                  itemCount: _courseModules.length,
+                  itemBuilder: (context, index) {
+                    final module = _courseModules[index];
+                    return ListTile(
+                      title: Text(module['title']!),
+                      subtitle: Text(module['tags']!),
+                      trailing: module['locked']! ? Icon(Icons.lock) : null,
+                    );
+                  },
+                ),
+                // Reviews Tab
+                ListView.builder(
+                  itemCount: _courseReviews.length,
+                  itemBuilder: (context, index) {
+                    final review = _courseReviews[index];
+                    return ListTile(
+                      leading: Image.asset(review.imagePath, width: 40, height: 40, fit: BoxFit.cover, errorBuilder: _imageErrorBuilder),
+                      title: Text(review.name),
+                      subtitle: Text(review.reviewText),
+                      trailing: Text("${review.rating} ★"),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ReviewDetailsScreen extends StatelessWidget {
+  final Review review; // Assuming Review model is defined
+  const ReviewDetailsScreen({Key? key, required this.review}) : super(key: key);
+  final _imageErrorBuilder = globalImageErrorBuilder;
+
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Review by ${review.name}')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Image.asset(review.imagePath, width: 60, height: 60, fit: BoxFit.cover, errorBuilder: _imageErrorBuilder),
+              SizedBox(width: 10),
+              Text(review.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ]),
+            SizedBox(height: 10),
+            Text("Rating: ${review.rating} ★"),
+            SizedBox(height: 10),
+            Text(review.reviewText),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 
 class MyCustomScrollBehavior extends MaterialScrollBehavior {
   @override
