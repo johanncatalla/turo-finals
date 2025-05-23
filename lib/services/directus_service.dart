@@ -1245,86 +1245,13 @@ class DirectusService {
   Future<Map<String, dynamic>> fetchTutorAvailabilities(String tutorProfileId) async {
     if (baseUrl == null) return {'success': false, 'message': 'API URL not configured.'};
     
-    // For testing purposes, return mock data for sample tutor IDs
-    if (tutorProfileId == '1' || tutorProfileId == '2' || tutorProfileId == '3') {
-      print('Returning mock availability data for tutor ID: $tutorProfileId');
-      
-      List<Map<String, dynamic>> mockData = [];
-      
-      if (tutorProfileId == '1') {
-        mockData = [
-          {
-            'id': 1,
-            'day_of_week': ['Monday', 'Tuesday'],
-            'start_time': '11:55:00',
-            'end_time': '12:55:00',
-            'recurring': true,
-            'specific_date': null,
-          },
-          {
-            'id': 1,
-            'day_of_week': ['Saturday'],
-            'start_time': '11:55:00', 
-            'end_time': '12:55:00',
-            'recurring': false,
-            'specific_date': '2025-05-24',
-          },
-          {
-            'id': 1,
-            'day_of_week': ['Friday', 'Saturday'],
-            'start_time': '08:51:00',
-            'end_time': '10:51:00', 
-            'recurring': true,
-            'specific_date': null,
-          },
-          {
-            'id': 1,
-            'day_of_week': ['Friday'],
-            'start_time': '08:51:00',
-            'end_time': '10:51:00',
-            'recurring': false,
-            'specific_date': '2025-05-30',
-          },
-        ];
-      } else if (tutorProfileId == '2') {
-        mockData = [
-          {
-            'id': 2,
-            'day_of_week': ['Tuesday', 'Wednesday'], 
-            'start_time': '12:00:00',
-            'end_time': '15:00:00',
-            'recurring': true,
-            'specific_date': null,
-          },
-          {
-            'id': 2,
-            'day_of_week': ['Monday', 'Wednesday'],
-            'start_time': '09:00:00',
-            'end_time': '10:00:00',
-            'recurring': true,
-            'specific_date': null,
-          },
-        ];
-      } else if (tutorProfileId == '3') {
-        mockData = [
-          {
-            'id': 3,
-            'day_of_week': ['Tuesday', 'Wednesday'],
-            'start_time': '12:00:00',
-            'end_time': '17:00:00',
-            'recurring': true,
-            'specific_date': null,
-          },
-        ];
-      }
-      
-      return {'success': true, 'data': mockData};
-    }
+    print('🔍 Fetching tutor availability from Directus for tutor profile ID: $tutorProfileId');
     
     try {
       final adminToken = dotenv.env['ADMIN_TOKEN'];
       if (adminToken == null) return {'success': false, 'message': 'Admin token not configured.'};
 
+      // Fetch availability from TutorAvailability collection
       final response = await http.get(
         Uri.parse('$baseUrl/items/TutorAvailability?filter[tutor_id][_eq]=$tutorProfileId&fields=id,day_of_week,start_time,end_time,recurring,specific_date'),
         headers: {
@@ -1332,13 +1259,30 @@ class DirectusService {
           'Authorization': 'Bearer $adminToken',
         },
       );
+
+      print('📡 Directus API Response Status: ${response.statusCode}');
+      print('📡 Directus API Response Body: ${response.body}');
+
       final data = jsonDecode(response.body);
+
       if (response.statusCode == 200) {
-        return {'success': true, 'data': data['data']};
+        final availabilityData = data['data'] as List? ?? [];
+        print('✅ Successfully fetched ${availabilityData.length} availability records from Directus');
+
+        // Log each record for debugging
+        for (int i = 0; i < availabilityData.length; i++) {
+          final record = availabilityData[i];
+          print('   📋 Record ${i + 1}: ${record}');
+        }
+
+        return {'success': true, 'data': availabilityData};
       } else {
-        return {'success': false, 'message': data['errors']?[0]?['message'] ?? 'Failed to fetch availabilities'};
+        final errorMessage = data['errors']?[0]?['message'] ?? 'Failed to fetch availabilities';
+        print('❌ Directus API Error: $errorMessage');
+        return {'success': false, 'message': errorMessage};
       }
     } catch (e) {
+      print('💥 Exception fetching availability: ${e.toString()}');
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
