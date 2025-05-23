@@ -214,7 +214,11 @@ class _StudentProfileMainScreenState extends State<StudentProfileMainScreen> {
                   name: "Joshua Garcia",
                   description: "A dedicated college student with a passion for language and education. Currently pursuing a degree in Psychology...",
                   imageUrl: "assets/profile.png", 
-                  isVerified: true);
+                  isVerified: true,
+                  tutorUserId: "sample-user-id-1",
+                  tutorProfileId: "sample-tutor-profile-1",
+                  hourlyRate: 100.0,
+              );
 
               Navigator.push(
                 context,

@@ -12,6 +12,7 @@ import '../../services/directus_service.dart';
 import '../../screens/Tutors/tabs/courses_tab.dart';
 import '../../screens/Tutors/tabs/modules_tab.dart';
 import '../../screens/Tutors/tabs/reviews_tab.dart';
+import '../../Widgets/tutor_availability_manager.dart';
 // Import TutorHomepage if needed for navigation
 import '../../screens/Tutors/tutor_homepage.dart';
 import 'EditTutorProfileScreen.dart'; // Assuming this is the path
@@ -129,7 +130,7 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
   void initState() {
     super.initState();
     _bottomNavIndex = 2;
-    _tabController = TabController(length: 3, vsync: this, initialIndex: 0);
+    _tabController = TabController(length: 4, vsync: this, initialIndex: 0);
     _tabController.addListener(() {
       if (!mounted) return;
       if (_tabController.indexIsChanging ||
@@ -387,6 +388,7 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
                     Tab(text: 'Courses'),
                     Tab(text: 'Modules'),
                     Tab(text: 'Reviews'),
+                    Tab(text: 'Availability'),
                   ],
                 ),
               ),
@@ -406,6 +408,13 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
               borderColor: _borderColor,
             ),
             ReviewsTab(
+              secondaryTextColor: _secondaryTextColor,
+              cardBackgroundColor: _cardBackgroundColor,
+              shadowColor: _shadowColor,
+              borderColor: _borderColor,
+            ),
+            AvailabilityTab(
+              primaryColor: _primaryColor,
               secondaryTextColor: _secondaryTextColor,
               cardBackgroundColor: _cardBackgroundColor,
               shadowColor: _shadowColor,
@@ -453,6 +462,68 @@ class _TutorProfileScreenState extends State<TutorProfileScreen>
       cardBackgroundColor: _cardBackgroundColor,
       shadowColor: _shadowColor,
       borderColor: _borderColor,
+    );
+  }
+
+  Widget AvailabilityTab({
+    required Color primaryColor,
+    required Color secondaryTextColor,
+    required Color cardBackgroundColor,
+    required Color shadowColor,
+    required Color borderColor,
+  }) {
+    // Get the tutor profile ID
+    final tutorProfileId = tutorProfileData?['id']?.toString();
+
+    if (tutorProfileId == null) {
+      return Container(
+        padding: const EdgeInsets.all(32),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.schedule_outlined,
+                size: 64,
+                color: secondaryTextColor,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Availability Management',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: secondaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Complete your tutor profile to manage your availability.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: secondaryTextColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: TutorAvailabilityManager(
+        tutorProfileId: tutorProfileId,
+        primaryColor: primaryColor,
+        secondaryTextColor: secondaryTextColor,
+        cardBackgroundColor: cardBackgroundColor,
+        shadowColor: shadowColor,
+        borderColor: borderColor,
+        onAvailabilityChanged: () {
+          // Optional: Refresh any related data when availability changes
+          print('Availability updated from tutor profile');
+        },
+      ),
     );
   }
 

@@ -1392,4 +1392,616 @@ class DirectusService {
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
+
+  // Get all students enrolled in courses taught by a specific tutor
+  Future<Map<String, dynamic>> getTutorStudents(String tutorUserId) async {
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      // First, find the tutor profile for this user
+      final tutorResponse = await http.get(
+        Uri.parse('$baseUrl/items/Tutors?filter={"user_id":"$tutorUserId"}&fields=id'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+
+      if (tutorResponse.statusCode != 200) {
+        final tutorData = jsonDecode(tutorResponse.body);
+        return {
+          'success': false,
+          'message': tutorData['errors']?[0]?['message'] ?? 'Failed to fetch tutor profile'
+        };
+      }
+
+      final tutorData = jsonDecode(tutorResponse.body);
+      final tutors = tutorData['data'] as List;
+
+      if (tutors.isEmpty) {
+        return {
+          'success': true,
+          'data': [],
+          'message': 'No tutor profile found for this user'
+        };
+      }
+
+      final tutorId = tutors[0]['id'];
+
+      // Now get all courses taught by this tutor using the tutor profile ID
+      final coursesResponse = await http.get(
+        Uri.parse('$baseUrl/items/Courses?filter={"tutor_id":"$tutorId"}&fields=id,title'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+
+      if (coursesResponse.statusCode != 200) {
+        final coursesData = jsonDecode(coursesResponse.body);
+        return {
+          'success': false,
+          'message': coursesData['errors']?[0]?['message'] ?? 'Failed to fetch tutor courses'
+        };
+      }
+
+      final coursesData = jsonDecode(coursesResponse.body);
+      final courses = coursesData['data'] as List;
+
+      if (courses.isEmpty) {
+        return {
+          'success': true,
+          'data': [],
+          'message': 'No courses found for this tutor'
+        };
+      }
+
+      // Extract course IDs
+      final courseIds = courses.map((course) => course['id']).toList();
+
+      // Get all students enrolled in these courses through the junction table
+      final studentsResponse = await http.get(
+        Uri.parse('$baseUrl/items/junction_directus_users_Courses?filter={"Courses_id":{"_in":${jsonEncode(courseIds)}}}&fields=*,directus_users_id.*,Courses_id.*'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+
+      if (studentsResponse.statusCode != 200) {
+        final errorData = jsonDecode(studentsResponse.body);
+        return {
+          'success': false,
+          'message': errorData['errors']?[0]?['message'] ?? 'Failed to fetch enrolled students'
+        };
+      }
+
+      final studentsData = jsonDecode(studentsResponse.body);
+      final junctionItems = studentsData['data'] as List;
+
+      // Process the junction data to get unique students with their course enrollments
+      Map<String, Map<String, dynamic>> uniqueStudents = {};
+
+      for (var item in junctionItems) {
+        final user = item['directus_users_id'];
+        final course = item['Courses_id'];
+        
+        // Only include users who are students
+        if (user != null && user['user_type'] == 'Student') {
+          final userId = user['id'];
+          
+          if (!uniqueStudents.containsKey(userId)) {
+            uniqueStudents[userId] = {
+              'id': user['id'],
+              'first_name': user['first_name'],
+              'last_name': user['last_name'],
+              'email': user['email'],
+              'user_type': user['user_type'],
+              'avatar': user['avatar'],
+              'enrolled_courses': []
+            };
+          }
+          
+          // Add course to student's enrolled courses list
+          if (course != null) {
+            uniqueStudents[userId]!['enrolled_courses'].add({
+              'id': course['id'],
+              'title': course['title']
+            });
+          }
+        }
+      }
+
+      print('getTutorStudents: Successfully found ${uniqueStudents.length} students enrolled in ${courses.length} courses');
+
+      return {
+        'success': true,
+        'data': uniqueStudents.values.toList()
+      };
+    } catch (e) {
+      print('Error fetching tutor students: ${e.toString()}');
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
+
+  // Update an existing Tutor Availability slot
+  Future<Map<String, dynamic>> updateTutorAvailability({
+    required String availabilityId,
+    required List<String> daysOfWeek,
+    required String startTime,
+    required String endTime,
+    required bool recurring,
+    String? specificDate,
+  }) async {
+    if (baseUrl == null) {
+      return {'success': false, 'message': 'API base URL is not configured.'}; 
+    }
+
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      Map<String, dynamic> payload = {
+        'day_of_week': daysOfWeek,
+        'start_time': startTime,
+        'end_time': endTime,
+        'recurring': recurring,
+      };
+
+      if (!recurring && specificDate != null && specificDate.isNotEmpty) {
+        payload['specific_date'] = specificDate;
+      } else if (recurring) {
+        payload['specific_date'] = null; // Clear specific date for recurring
+      }
+
+      final response = await http.patch(
+        Uri.parse('$baseUrl/items/TutorAvailability/$availabilityId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.body.isEmpty) {
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          return {'success': true, 'data': null, 'message': 'Availability updated successfully (no content). Status: ${response.statusCode}'};
+        } else {
+          return {'success': false, 'message': 'Failed to update availability. Status ${response.statusCode} (empty response).'};
+        }
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': data['data']};
+      } else {
+        String errorMessage = data['errors']?[0]?['message'] ?? data['message'] ?? 'Failed to update availability.';
+        return {
+          'success': false,
+          'message': errorMessage,
+          'statusCode': response.statusCode
+        };
+      }
+    } catch (e) {
+      print('Error in updateTutorAvailability: $e');
+      return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
+    }
+  }
+
+  // ============================================================================
+  // BOOKING RELATED METHODS
+  // ============================================================================
+
+  // Create a new booking
+  Future<Map<String, dynamic>> createBooking({
+    required String clientId,
+    required String tutorId,
+    required String courseId,
+    required List<String> schedule, // Days of week
+    required String mode, // "Online" or "In-person"
+    required int totalHours,
+    required double totalCost,
+    List<String>? subjectIds,
+    String status = 'Pending',
+    String paymentStatus = 'Unpaid',
+  }) async {
+    if (baseUrl == null) {
+      return {'success': false, 'message': 'API base URL is not configured.'};
+    }
+
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      Map<String, dynamic> payload = {
+        'client_id': clientId,
+        'tutor_id': tutorId,
+        'course_id': courseId,
+        'schedule': schedule,
+        'status': status,
+        'mode': mode,
+        'payment_status': paymentStatus,
+        'total_hours': totalHours,
+        'total_cost': totalCost,
+      };
+
+      // Add subjects if provided
+      if (subjectIds != null && subjectIds.isNotEmpty) {
+        payload['subjects'] = subjectIds;
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/items/Bookings'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.body.isEmpty) {
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          return {'success': true, 'data': null, 'message': 'Booking created successfully (no content). Status: ${response.statusCode}'};
+        } else {
+          return {'success': false, 'message': 'Failed to create booking. Status ${response.statusCode} (empty response).'};
+        }
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true, 'data': data['data']};
+      } else {
+        String errorMessage = data['errors']?[0]?['message'] ?? data['message'] ?? 'Failed to create booking.';
+        return {
+          'success': false,
+          'message': errorMessage,
+          'statusCode': response.statusCode
+        };
+      }
+    } catch (e) {
+      print('Error in createBooking: $e');
+      return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
+    }
+  }
+
+  // Create chosen dates for a booking
+  Future<Map<String, dynamic>> createChosenDates({
+    required String bookingId,
+    required List<Map<String, dynamic>> dateTimeSlots, // [{date, start_time, end_time}]
+  }) async {
+    if (baseUrl == null) {
+      return {'success': false, 'message': 'API base URL is not configured.'};
+    }
+
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      List<Map<String, dynamic>> createdDates = [];
+      List<String> errors = [];
+
+      for (var slot in dateTimeSlots) {
+        Map<String, dynamic> payload = {
+          'booking_id': bookingId,
+          'date': slot['date'],
+          'start_time': slot['start_time'],
+          'end_time': slot['end_time'],
+          'status': 'Pending',
+        };
+
+        final response = await http.post(
+          Uri.parse('$baseUrl/items/ChosenDates'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $adminToken',
+          },
+          body: jsonEncode(payload),
+        );
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          if (response.body.isNotEmpty) {
+            final data = jsonDecode(response.body);
+            createdDates.add(data['data']);
+          }
+        } else {
+          String errorMessage = 'Failed to create date slot';
+          try {
+            if (response.body.isNotEmpty) {
+              final data = jsonDecode(response.body);
+              errorMessage = data['errors']?[0]?['message'] ?? errorMessage;
+            }
+          } catch (e) {/* ignore json decode error */}
+          errors.add('$errorMessage for ${slot['date']} ${slot['start_time']}-${slot['end_time']}');
+        }
+      }
+
+      if (errors.isEmpty) {
+        return {'success': true, 'data': createdDates};
+      } else if (createdDates.isNotEmpty) {
+        return {
+          'success': true,
+          'data': createdDates,
+          'message': 'Some dates created successfully, but there were errors: ${errors.join(', ')}'
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Failed to create any date slots: ${errors.join(', ')}'
+        };
+      }
+    } catch (e) {
+      print('Error in createChosenDates: $e');
+      return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
+    }
+  }
+
+  // Get bookings for a specific user (either as client or tutor)
+  Future<Map<String, dynamic>> getUserBookings(String userId, {String? role}) async {
+    if (baseUrl == null) {
+      return {'success': false, 'message': 'API base URL is not configured.'};
+    }
+
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      String filterField;
+      if (role == 'tutor') {
+        filterField = 'tutor_id';
+      } else if (role == 'client' || role == 'student') {
+        filterField = 'client_id';
+      } else {
+        // Get both client and tutor bookings
+        final clientBookings = await getUserBookings(userId, role: 'client');
+        final tutorBookings = await getUserBookings(userId, role: 'tutor');
+        
+        List<dynamic> allBookings = [];
+        if (clientBookings['success']) {
+          allBookings.addAll(clientBookings['data'] ?? []);
+        }
+        if (tutorBookings['success']) {
+          allBookings.addAll(tutorBookings['data'] ?? []);
+        }
+        
+        return {'success': true, 'data': allBookings};
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/items/Bookings?filter={"$filterField":"$userId"}&fields=*,client_id.*,tutor_id.*,course_id.*,dates.*'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {'success': true, 'data': data['data']};
+      } else {
+        final data = jsonDecode(response.body);
+        String errorMessage = data['errors']?[0]?['message'] ?? 'Failed to fetch bookings.';
+        return {'success': false, 'message': errorMessage};
+      }
+    } catch (e) {
+      print('Error in getUserBookings: $e');
+      return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
+    }
+  }
+
+  // Get specific booking details with all related data
+  Future<Map<String, dynamic>> getBookingDetails(String bookingId) async {
+    if (baseUrl == null) {
+      return {'success': false, 'message': 'API base URL is not configured.'};
+    }
+
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/items/Bookings/$bookingId?fields=*,client_id.*,tutor_id.*,course_id.*,subjects.*,dates.*'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {'success': true, 'data': data['data']};
+      } else {
+        final data = jsonDecode(response.body);
+        String errorMessage = data['errors']?[0]?['message'] ?? 'Failed to fetch booking details.';
+        return {'success': false, 'message': errorMessage};
+      }
+    } catch (e) {
+      print('Error in getBookingDetails: $e');
+      return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
+    }
+  }
+
+  // Update booking status
+  Future<Map<String, dynamic>> updateBookingStatus(String bookingId, String status) async {
+    if (baseUrl == null) {
+      return {'success': false, 'message': 'API base URL is not configured.'};
+    }
+
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      Map<String, dynamic> payload = {'status': status};
+
+      final response = await http.patch(
+        Uri.parse('$baseUrl/items/Bookings/$bookingId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {'success': true, 'data': data['data']};
+      } else {
+        final data = jsonDecode(response.body);
+        String errorMessage = data['errors']?[0]?['message'] ?? 'Failed to update booking status.';
+        return {'success': false, 'message': errorMessage};
+      }
+    } catch (e) {
+      print('Error in updateBookingStatus: $e');
+      return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
+    }
+  }
+
+  // Update payment status
+  Future<Map<String, dynamic>> updatePaymentStatus(String bookingId, String paymentStatus) async {
+    if (baseUrl == null) {
+      return {'success': false, 'message': 'API base URL is not configured.'};
+    }
+
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      Map<String, dynamic> payload = {'payment_status': paymentStatus};
+
+      final response = await http.patch(
+        Uri.parse('$baseUrl/items/Bookings/$bookingId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {'success': true, 'data': data['data']};
+      } else {
+        final data = jsonDecode(response.body);
+        String errorMessage = data['errors']?[0]?['message'] ?? 'Failed to update payment status.';
+        return {'success': false, 'message': errorMessage};
+      }
+    } catch (e) {
+      print('Error in updatePaymentStatus: $e');
+      return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
+    }
+  }
+
+  // Update chosen date status
+  Future<Map<String, dynamic>> updateChosenDateStatus(String chosenDateId, String status) async {
+    if (baseUrl == null) {
+      return {'success': false, 'message': 'API base URL is not configured.'};
+    }
+
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      Map<String, dynamic> payload = {'status': status};
+
+      final response = await http.patch(
+        Uri.parse('$baseUrl/items/ChosenDates/$chosenDateId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {'success': true, 'data': data['data']};
+      } else {
+        final data = jsonDecode(response.body);
+        String errorMessage = data['errors']?[0]?['message'] ?? 'Failed to update chosen date status.';
+        return {'success': false, 'message': errorMessage};
+      }
+    } catch (e) {
+      print('Error in updateChosenDateStatus: $e');
+      return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
+    }
+  }
+
+  // Delete a booking (and its associated chosen dates)
+  Future<Map<String, dynamic>> deleteBooking(String bookingId) async {
+    if (baseUrl == null) {
+      return {'success': false, 'message': 'API base URL is not configured.'};
+    }
+
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      // First, delete all associated chosen dates
+      final chosenDatesResponse = await http.get(
+        Uri.parse('$baseUrl/items/ChosenDates?filter={"booking_id":"$bookingId"}&fields=id'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+
+      if (chosenDatesResponse.statusCode == 200) {
+        final chosenDatesData = jsonDecode(chosenDatesResponse.body);
+        final chosenDates = chosenDatesData['data'] as List;
+        
+        for (var date in chosenDates) {
+          await http.delete(
+            Uri.parse('$baseUrl/items/ChosenDates/${date['id']}'),
+            headers: {'Authorization': 'Bearer $adminToken'},
+          );
+        }
+      }
+
+      // Then delete the booking
+      final response = await http.delete(
+        Uri.parse('$baseUrl/items/Bookings/$bookingId'),
+        headers: {'Authorization': 'Bearer $adminToken'},
+      );
+
+      if (response.statusCode == 204 || response.statusCode == 200) {
+        return {'success': true, 'message': 'Booking deleted successfully.'};
+      } else {
+        String errorMessage = 'Failed to delete booking.';
+        try {
+          if (response.body.isNotEmpty) {
+            final data = jsonDecode(response.body);
+            errorMessage = data['errors']?[0]?['message'] ?? errorMessage;
+          }
+        } catch (e) {/* ignore json decode error */}
+        return {'success': false, 'message': '$errorMessage Status: ${response.statusCode}'};
+      }
+    } catch (e) {
+      print('Error in deleteBooking: $e');
+      return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
+    }
+  }
 }

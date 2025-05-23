@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:turo/providers/course_provider.dart';
+import 'package:turo/Screens/Students/book_tutor_session_screen.dart';
 
 class InstructorDetailScreen extends StatelessWidget {
   final Map<String, dynamic> instructor;
@@ -135,32 +136,76 @@ class InstructorDetailScreen extends StatelessWidget {
                   
                   const SizedBox(height: 24),
                   
-                  // Contact button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // TODO: Implement contact functionality
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Contact request sent to ${instructor['name']}')),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                  // Action buttons
+                  Row(
+                    children: [
+                      // Book button
+                      Expanded(
+                        child: SizedBox(
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              // Navigate to booking screen
+                              // Note: You may need to adapt this based on how instructor data maps to tutor data
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => BookTutorSessionScreen(
+                                    tutorUserId: instructor['id']?.toString() ?? instructor['user_id']?.toString() ?? 'unknown-id',
+                                    tutorName: instructor['name']?.toString() ?? 'Unknown Instructor',
+                                    tutorProfileId: instructor['profile_id']?.toString(),
+                                    hourlyRate: instructor['hourly_rate'] is num ? instructor['hourly_rate'].toDouble() : 100.0,
+                                  ),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: const Text(
+                              'Book',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      child: const Text(
-                        'Contact Instructor',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                      const SizedBox(width: 12),
+                      // Contact button
+                      Expanded(
+                        child: SizedBox(
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              // TODO: Implement contact functionality
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Contact request sent to ${instructor['name']}')),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: const Text(
+                              'Contact',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),

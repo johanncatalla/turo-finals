@@ -4,6 +4,8 @@ import 'dart:ui' show PointerDeviceKind;
 import 'package:turo/Widgets/navbar.dart';
 import 'package:turo/Screens/Students/student_CourseSectionUI.dart';
 import 'package:turo/Screens/Students/studentprofileUI.dart' hide Course, CourseDetailsScreen; // Hide potential duplicates
+import 'package:turo/Widgets/tutor_availability_display.dart';
+import 'package:turo/Screens/Students/book_tutor_session_screen.dart';
 
 // --- Define Custom Colors (Ensure consistency or move to a theme file) ---
 const Color primaryTeal = Color(0xFF3F8E9B); // Used for verified icon, tab indicator
@@ -62,7 +64,7 @@ class _StudentViewTutorProfileScreenState extends State<StudentViewTutorProfileS
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this, initialIndex: 0);
+    _tabController = TabController(length: 4, vsync: this, initialIndex: 0);
   }
 
   @override
@@ -161,7 +163,7 @@ class _StudentViewTutorProfileScreenState extends State<StudentViewTutorProfileS
                     indicator: const BoxDecoration( 
                       border: Border( bottom: BorderSide( color: primaryTeal, width: 3.0))),
                     tabs: const [ 
-                       Tab(text: 'Courses'), Tab(text: 'Modules'), Tab(text: 'Reviews')],
+                       Tab(text: 'Courses'), Tab(text: 'Modules'), Tab(text: 'Reviews'), Tab(text: 'Availability')],
                   ),
                 ),
                 pinned: true, 
@@ -173,7 +175,8 @@ class _StudentViewTutorProfileScreenState extends State<StudentViewTutorProfileS
               // Content for each tab
               _buildCoursesList(context),   // Tab 1: Courses
               _buildModulesList(context),   // Tab 2: Modules
-              _buildReviewsList(context)    // Tab 3: Reviews
+              _buildReviewsList(context),   // Tab 3: Reviews
+              _buildAvailability(context),  // Tab 4: Availability
             ],
           ),
         ),
@@ -225,7 +228,31 @@ class _StudentViewTutorProfileScreenState extends State<StudentViewTutorProfileS
               mainAxisSize: MainAxisSize.min,
               children: [
                   OutlinedButton(
-                    onPressed: () {  print("Book tapped"); },
+                    onPressed: () {
+                      // Check if required booking information is available
+                      if (widget.lecturer.tutorUserId == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Booking not available - tutor information incomplete'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      // Navigate to booking screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => BookTutorSessionScreen(
+                            tutorUserId: widget.lecturer.tutorUserId!,
+                            tutorName: widget.lecturer.name,
+                            tutorProfileId: widget.lecturer.tutorProfileId,
+                            hourlyRate: widget.lecturer.hourlyRate,
+                          ),
+                        ),
+                      );
+                    },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: primaryOrange, // Text/icon color
                       side: const BorderSide(color: primaryOrange, width: 1.5), 
@@ -518,6 +545,68 @@ class _StudentViewTutorProfileScreenState extends State<StudentViewTutorProfileS
                 ),
               ]
             )
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Widget Builder: Availability (for TabView) ---
+  Widget _buildAvailability(BuildContext context) {
+    // Check if tutorProfileId is available to show real availability data
+    if (widget.lecturer.tutorProfileId != null) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: TutorAvailabilityDisplay(
+          tutorProfileId: widget.lecturer.tutorProfileId!,
+          primaryColor: primaryTeal,
+          secondaryTextColor: greyText,
+          cardBackgroundColor: Colors.white,
+          shadowColor: Colors.grey.withOpacity(0.1),
+          borderColor: Colors.grey.shade300,
+          compact: false,
+        ),
+      );
+    }
+    
+    // Show placeholder if tutorProfileId is not available
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.schedule_outlined,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Availability Information',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'This tutor\'s availability schedule is not available at the moment.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey[500],
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'You can still book a session using the Book button above.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 12,
+              fontStyle: FontStyle.italic,
+            ),
           ),
         ],
       ),

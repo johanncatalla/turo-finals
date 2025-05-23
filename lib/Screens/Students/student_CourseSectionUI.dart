@@ -128,12 +128,18 @@ class Lecturer {
   final String description;
   final String imageUrl;
   final bool isVerified;
+  final String? tutorUserId; // User ID from directus_users table
+  final String? tutorProfileId; // ID from Tutors table  
+  final double? hourlyRate; // Hourly rate for booking
 
   Lecturer({
     required this.name,
     required this.description,
     required this.imageUrl,
     this.isVerified = true,
+    this.tutorUserId,
+    this.tutorProfileId,
+    this.hourlyRate,
   });
 }
 
@@ -190,6 +196,9 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen>
           "A dedicated college student with a passion for language and education. Currently pursuing a degree in Psychology at Manuel S. Enverga University Foundation, I spend my free time tutoring high school students in both English and Filipino. ",
       imageUrl: "assets/profile.png", 
       isVerified: true,
+      tutorUserId: "sample-user-id-1", // Replace with actual user ID from your database
+      tutorProfileId: "sample-tutor-profile-1", // Replace with actual tutor profile ID
+      hourlyRate: 100.0,
     ),
     Lecturer(
       name: "Andres Muhlach",
@@ -197,6 +206,9 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen>
           "A dedicated college student with a passion for language and education. Currently pursuing a degree in Psychology at Manuel S. Enverga University Foundation, I spend my free time tutoring high school students in both English and Filipino. ",
       imageUrl: "assets/tutor2.png",
       isVerified: true,
+      tutorUserId: "sample-user-id-2", // Replace with actual user ID from your database
+      tutorProfileId: "sample-tutor-profile-2", // Replace with actual tutor profile ID
+      hourlyRate: 120.0,
     ),
   ];
   final List<CourseMaterial> materials = [

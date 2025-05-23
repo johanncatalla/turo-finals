@@ -12,6 +12,8 @@ import 'package:turo/screens/Tutors/tabs/courses_tab.dart';
 import 'package:turo/screens/Tutors/tabs/modules_tab.dart';
 import 'package:turo/screens/Tutors/tabs/videos_tab.dart';
 import 'package:turo/screens/Tutors/tabs/reviews_tab.dart';
+import 'package:turo/screens/Tutors/tabs/students_tab.dart';
+import 'package:turo/screens/Tutors/tabs/bookings_tab.dart';
 
 class TutorHomepage extends StatefulWidget {
   const TutorHomepage({super.key});
@@ -48,7 +50,7 @@ class _TutorHomepageState extends State<TutorHomepage>
     // _directusService = DirectusService(); // Not needed directly for courses
     // _directusBaseUrl = dotenv.env['DIRECTUS_API_URL']; // Get from CourseProvider
 
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() {
@@ -325,6 +327,8 @@ class _TutorHomepageState extends State<TutorHomepage>
           Tab(text: 'Modules'),
           Tab(text: 'Videos'),
           Tab(text: 'Reviews'),
+          Tab(text: 'Students'),
+          Tab(text: 'Bookings'),
         ],
       ),
     );
@@ -385,6 +389,22 @@ class _TutorHomepageState extends State<TutorHomepage>
                 );
               case 4:
                 return ReviewsTab(
+                  secondaryTextColor: _secondaryTextColor,
+                  cardBackgroundColor: _cardBackgroundColor,
+                  shadowColor: _shadowColor,
+                  borderColor: _borderColor,
+                );
+              case 5:
+                return StudentsTab(
+                  primaryColor: _primaryColor,
+                  secondaryTextColor: _secondaryTextColor,
+                  cardBackgroundColor: _cardBackgroundColor,
+                  shadowColor: _shadowColor,
+                  borderColor: _borderColor,
+                );
+              case 6:
+                return BookingsTab(
+                  primaryColor: _primaryColor,
                   secondaryTextColor: _secondaryTextColor,
                   cardBackgroundColor: _cardBackgroundColor,
                   shadowColor: _shadowColor,
