@@ -1177,4 +1177,168 @@ class DirectusService {
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
+  Future<Map<String, dynamic>> updateCourse({
+    required String courseId, // ID of the course to update
+    required String title,
+    required String description,
+    required String subjectId,
+    // tutorId usually doesn't change, but include if it can
+    // required String tutorId,
+    required String? courseImageId, // Pass null if image is not changed, or new ID if changed
+  }) async {
+    if (baseUrl == null) {
+      return {'success': false, 'message': 'API base URL is not configured.'};
+    }
+
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      Map<String, dynamic> payload = {
+        'title': title,
+        'description': description,
+        'subject_id': subjectId,
+        // 'tutor_id': tutorId, // Uncomment if tutor can be changed
+      };
+
+      // Only include course_image in payload if it's being updated or set
+      // If courseImageId is null, it means we might be unsetting it or not changing it.
+      // If you want "not changing it" to mean "keep the existing one",
+      // then Directus PATCH will do that by default if you don't send the key.
+      // If you want to explicitly set it to null (remove image), send 'course_image': null.
+      if (courseImageId != null) { // If you have a new image ID
+        payload['course_image'] = courseImageId;
+      } else {
+        // If you want to allow REMOVING an image by passing null explicitly
+        // payload['course_image'] = null;
+        // Otherwise, if courseImageId is null and you don't send the key,
+        // Directus will leave the existing image untouched.
+        // For this example, we'll assume if courseImageId is null, we don't send the key,
+        // meaning if no new image is selected, the old one stays.
+        // If you want to remove an image, you'd need a separate UI action and pass null here.
+      }
+
+
+      final response = await http.patch( // Use PATCH for updates
+        Uri.parse('$baseUrl/items/Courses/$courseId'), // Endpoint for specific course
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.body.isEmpty) {
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          return {'success': true, 'data': null, 'message': 'Course updated successfully (no content). Status: ${response.statusCode}'};
+        } else {
+          return {'success': false, 'message': 'Failed to update course. Status ${response.statusCode} (empty response).'};
+        }
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) { // HTTP 200 for successful PATCH
+        return {'success': true, 'data': data['data']};
+      } else {
+        String errorMessage = data['errors']?[0]?['message'] ?? data['message'] ?? 'Failed to update course.';
+        return {
+          'success': false,
+          'message': errorMessage,
+          'statusCode': response.statusCode
+        };
+      }
+    } catch (e) {
+      print('Error in updateCourse: $e');
+      // ... (your existing error handling for network/format exceptions) ...
+      return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
+    }
+  }
+
+  // Helper to fetch a single course item for editing (if needed)
+  Future<Map<String, dynamic>> getCourseDetailsForEdit(String courseId) async {
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      if (adminToken == null) {
+        return {'success': false, 'message': 'Admin token not configured'};
+      }
+
+      // Fetch course with fields relevant for editing.
+      // Include course_image.id if you want to pre-fill existing image.
+      final response = await http.get(
+        Uri.parse('$baseUrl/items/Courses/$courseId?fields=id,title,description,subject_id.id,course_image.id,tutor_id.id'), // Adjust fields as needed
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': data['data']};
+      } else {
+        return {'success': false, 'message': data['errors']?[0]?['message'] ?? 'Failed to fetch course for editing'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
+  Future<Map<String, dynamic>> fetchTutorAvailabilities(String tutorProfileId) async {
+    if (baseUrl == null) return {'success': false, 'message': 'API URL not configured.'};
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      if (adminToken == null) return {'success': false, 'message': 'Admin token not configured.'};
+
+      // Adjust 'TutorAvailability' to your collection key and 'tutor_id' to your foreign key field name
+      final response = await http.get(
+        Uri.parse('$baseUrl/items/TutorAvailability?filter[tutor_id][_eq]=$tutorProfileId&fields=id,day_of_week,start_time,end_time,recurring,specific_date'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': data['data']};
+      } else {
+        return {'success': false, 'message': data['errors']?[0]?['message'] ?? 'Failed to fetch availabilities'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
+
+  // Delete a specific Tutor Availability slot by its ID
+  Future<Map<String, dynamic>> deleteTutorAvailability(String availabilityId) async {
+    if (baseUrl == null) return {'success': false, 'message': 'API URL not configured.'};
+    try {
+      final adminToken = dotenv.env['ADMIN_TOKEN'];
+      if (adminToken == null) return {'success': false, 'message': 'Admin token not configured.'};
+
+      final response = await http.delete(
+        Uri.parse('$baseUrl/items/TutorAvailability/$availabilityId'),
+        headers: {'Authorization': 'Bearer $adminToken'},
+      );
+
+      if (response.statusCode == 204) { // HTTP 204 No Content for successful DELETE
+        return {'success': true, 'message': 'Availability deleted successfully.'};
+      } else if (response.statusCode == 200 && response.body.isNotEmpty) {
+        // Sometimes Directus might return 200 with data on delete, handle if necessary
+        return {'success': true, 'message': 'Availability deleted (with response).', 'data': jsonDecode(response.body)};
+      }
+      else {
+        String errorMessage = 'Failed to delete availability.';
+        try {
+          if (response.body.isNotEmpty) {
+            final data = jsonDecode(response.body);
+            errorMessage = data['errors']?[0]?['message'] ?? errorMessage;
+          }
+        } catch (e) {/* ignore json decode error if body is not json */}
+        return {'success': false, 'message': '$errorMessage Status: ${response.statusCode}'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
 }
