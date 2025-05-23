@@ -62,6 +62,7 @@ class MyApp extends StatelessWidget {
         '/search': (context) => const Search(),
         '/courses': (context) => const MyCoursesScreen(),
         '/profile': (context) => const StudentProfileScreen(),
+        '/role_select': (context) => const RoleSelectionScreen(),
       },
     );
   }
