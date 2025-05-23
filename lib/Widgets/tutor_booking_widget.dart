@@ -234,6 +234,11 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
     return null;
   }
 
+  String _formatTimeString(String? timeString) {
+    if (timeString == null) return 'Unknown';
+    return timeString.length >= 5 ? timeString.substring(0, 5) : timeString;
+  }
+
   void _addTimeSlot() {
     if (_selectedDay == null || _selectedStartTime == null || _selectedEndTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -975,7 +980,7 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
                 children: [
                   Expanded(
                     child: Text(
-                      '${slot['date']} | ${slot['start_time'].substring(0, 5)} - ${slot['end_time'].substring(0, 5)} (${slot['duration'].toStringAsFixed(1)}h)',
+                      '${slot['date']} | ${_formatTimeString(slot['start_time'])} - ${_formatTimeString(slot['end_time'])} (${slot['duration'].toStringAsFixed(1)}h)',
                       style: TextStyle(
                         color: widget.primaryColor,
                         fontWeight: FontWeight.w500,

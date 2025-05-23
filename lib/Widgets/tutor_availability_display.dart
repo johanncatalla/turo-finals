@@ -220,13 +220,23 @@ class _TutorAvailabilityDisplayState extends State<TutorAvailabilityDisplay> {
     );
   }
 
+  String _formatTimeString(String? timeString) {
+    if (timeString == null) return '';
+    return timeString.length >= 5 ? timeString.substring(0, 5) : timeString;
+  }
+
+  String _formatDayName(String? dayName) {
+    if (dayName == null) return '';
+    return dayName.length >= 3 ? dayName.substring(0, 3) : dayName;
+  }
+
   Widget _buildCompactSchedule(List<Map<String, dynamic>> availabilities) {
     // Group by time slots
     Map<String, List<String>> timeSlots = {};
     
     for (var availability in availabilities) {
-      final startTime = availability['start_time']?.substring(0, 5) ?? '';
-      final endTime = availability['end_time']?.substring(0, 5) ?? '';
+      final startTime = _formatTimeString(availability['start_time']);
+      final endTime = _formatTimeString(availability['end_time']);
       final timeSlot = '$startTime - $endTime';
       
       if (availability['day_of_week'] is List) {
@@ -269,7 +279,7 @@ class _TutorAvailabilityDisplayState extends State<TutorAvailabilityDisplay> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      days.map((day) => day.substring(0, 3)).join(', '),
+                      days.map((day) => _formatDayName(day)).join(', '),
                       style: TextStyle(
                         color: widget.secondaryTextColor,
                         fontSize: 12,
@@ -338,7 +348,7 @@ class _TutorAvailabilityDisplayState extends State<TutorAvailabilityDisplay> {
                   Icon(Icons.access_time, size: 18, color: widget.secondaryTextColor),
                   const SizedBox(width: 8),
                   Text(
-                    '${availability['start_time']?.substring(0, 5) ?? ''} - ${availability['end_time']?.substring(0, 5) ?? ''}',
+                    '${_formatTimeString(availability['start_time'])} - ${_formatTimeString(availability['end_time'])}',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -427,7 +437,7 @@ class _TutorAvailabilityDisplayState extends State<TutorAvailabilityDisplay> {
                   Icon(Icons.access_time, size: 18, color: widget.secondaryTextColor),
                   const SizedBox(width: 8),
                   Text(
-                    '${availability['start_time']?.substring(0, 5) ?? ''} - ${availability['end_time']?.substring(0, 5) ?? ''}',
+                    '${_formatTimeString(availability['start_time'])} - ${_formatTimeString(availability['end_time'])}',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,

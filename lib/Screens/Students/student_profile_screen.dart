@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:turo/services/directus_service.dart';
 import 'dart:ui' show PointerDeviceKind;
 import 'package:fl_chart/fl_chart.dart';
+import 'package:turo/Widgets/booking_management_widget.dart';
 
 // --- Constants ---
 const Color primaryOrange = Color(0xFFF9A825);
@@ -599,6 +600,11 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
         
         const SizedBox(height: 24),
         
+        // My Bookings Section
+        _buildMyBookingsSection(context),
+        
+        const SizedBox(height: 24),
+        
         // User Information Sections - Improved layout with cards
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -1144,6 +1150,38 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     
     // Fallback to any instructor related fields
     return course['instructorName'] ?? course['instructorFirstName'] ?? 'Instructor';
+  }
+
+  Widget _buildMyBookingsSection(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'My Bookings',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: darkText,
+            ),
+          ),
+          const SizedBox(height: 12),
+          BookingManagementWidget(
+            userRole: 'student',
+            primaryColor: primaryOrange,
+            secondaryTextColor: greyText,
+            cardBackgroundColor: Colors.white,
+            shadowColor: Colors.grey,
+            borderColor: Colors.grey.shade300,
+            onBookingChanged: () {
+              // Optional: Refresh data if needed
+              print('Student booking changed');
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildProgressReportsSection(BuildContext context) {

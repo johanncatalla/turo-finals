@@ -219,6 +219,28 @@ class _BookingManagementWidgetState extends State<BookingManagementWidget> {
     return timeString.substring(0, timeString.length >= 5 ? 5 : timeString.length);
   }
 
+  String _formatBookingId(dynamic id) {
+    if (id == null) return 'Unknown';
+    final idString = id.toString();
+    return idString.length > 8 ? idString.substring(0, 8) : idString;
+  }
+
+  String _formatTotalCost(dynamic totalCost) {
+    if (totalCost == null) return '0.00';
+    if (totalCost is num) return totalCost.toStringAsFixed(2);
+    if (totalCost is String) {
+      // If it's already a string, try to parse it first, then format it
+      try {
+        final parsed = double.parse(totalCost);
+        return parsed.toStringAsFixed(2);
+      } catch (e) {
+        // If parsing fails, return the original string if it looks like a valid amount
+        return totalCost.contains('.') ? totalCost : '$totalCost.00';
+      }
+    }
+    return totalCost.toString();
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -421,7 +443,7 @@ class _BookingManagementWidgetState extends State<BookingManagementWidget> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Booking #${booking['id']?.toString().substring(0, 8) ?? 'Unknown'}',
+                      'Booking #${_formatBookingId(booking['id'])}',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -534,7 +556,7 @@ class _BookingManagementWidgetState extends State<BookingManagementWidget> {
                         Icon(Icons.access_time, size: 16, color: widget.secondaryTextColor),
                         const SizedBox(width: 8),
                         Text(
-                          '${booking['total_hours']} hours • ${booking['mode']} • ₱${booking['total_cost']?.toStringAsFixed(2) ?? '0.00'}',
+                          '${booking['total_hours']} hours • ${booking['mode']} • ₱${_formatTotalCost(booking['total_cost'])}',
                           style: TextStyle(
                             color: widget.secondaryTextColor,
                             fontSize: 12,
@@ -584,72 +606,74 @@ class _BookingManagementWidgetState extends State<BookingManagementWidget> {
 
                     const SizedBox(height: 16),
 
-                    // Action buttons
-                    Row(
-                      children: [
-                        if (booking['status'] == 'Pending') ...[
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => _updateBookingStatus(
-                                booking['id'].toString(),
-                                'Active',
+                    // Action buttons (only for tutors)
+                    if (widget.userRole == 'tutor') ...[
+                      Row(
+                        children: [
+                          if (booking['status'] == 'Pending') ...[
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => _updateBookingStatus(
+                                  booking['id'].toString(),
+                                  'Active',
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.green,
+                                  side: const BorderSide(color: Colors.green),
+                                ),
+                                child: const Text('Accept', style: TextStyle(fontSize: 12)),
                               ),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.green,
-                                side: const BorderSide(color: Colors.green),
-                              ),
-                              child: const Text('Accept', style: TextStyle(fontSize: 12)),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        
-                        if (booking['status'] == 'Active') ...[
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => _updateBookingStatus(
-                                booking['id'].toString(),
-                                'Completed',
+                            const SizedBox(width: 8),
+                          ],
+                          
+                          if (booking['status'] == 'Active') ...[
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => _updateBookingStatus(
+                                  booking['id'].toString(),
+                                  'Completed',
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.blue,
+                                  side: const BorderSide(color: Colors.blue),
+                                ),
+                                child: const Text('Complete', style: TextStyle(fontSize: 12)),
                               ),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.blue,
-                                side: const BorderSide(color: Colors.blue),
-                              ),
-                              child: const Text('Complete', style: TextStyle(fontSize: 12)),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
+                            const SizedBox(width: 8),
+                          ],
 
-                        if (booking['payment_status'] == 'Unpaid') ...[
+                          if (booking['payment_status'] == 'Unpaid') ...[
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => _updatePaymentStatus(
+                                  booking['id'].toString(),
+                                  'Paid',
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: widget.primaryColor,
+                                  side: BorderSide(color: widget.primaryColor),
+                                ),
+                                child: const Text('Mark Paid', style: TextStyle(fontSize: 12)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: () => _updatePaymentStatus(
-                                booking['id'].toString(),
-                                'Paid',
-                              ),
+                              onPressed: () => _deleteBooking(booking['id'].toString()),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: widget.primaryColor,
-                                side: BorderSide(color: widget.primaryColor),
+                                foregroundColor: Colors.red,
+                                side: const BorderSide(color: Colors.red),
                               ),
-                              child: const Text('Mark Paid', style: TextStyle(fontSize: 12)),
+                              child: const Text('Delete', style: TextStyle(fontSize: 12)),
                             ),
                           ),
-                          const SizedBox(width: 8),
                         ],
-
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => _deleteBooking(booking['id'].toString()),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.red,
-                              side: const BorderSide(color: Colors.red),
-                            ),
-                            child: const Text('Delete', style: TextStyle(fontSize: 12)),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -243,6 +243,16 @@ class _TutorAvailabilityManagerState extends State<TutorAvailabilityManager> {
     }
   }
 
+  String _formatTimeString(String? timeString) {
+    if (timeString == null) return '';
+    return timeString.length >= 5 ? timeString.substring(0, 5) : timeString;
+  }
+
+  String _formatDayName(String? dayName) {
+    if (dayName == null) return '';
+    return dayName.length >= 3 ? dayName.substring(0, 3) : dayName;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -457,7 +467,7 @@ class _TutorAvailabilityManagerState extends State<TutorAvailabilityManager> {
               children: _daysOfWeek.map((day) {
                 final isSelected = _selectedDays.contains(day);
                 return FilterChip(
-                  label: Text(day.substring(0, 3)),
+                  label: Text(_formatDayName(day)),
                   selected: isSelected,
                   onSelected: (selected) {
                     setState(() {
@@ -608,7 +618,7 @@ class _TutorAvailabilityManagerState extends State<TutorAvailabilityManager> {
                         children: (availability['day_of_week'] as List)
                             .map((day) => Chip(
                                   label: Text(
-                                    day.toString().substring(0, 3),
+                                    _formatDayName(day.toString()),
                                     style: const TextStyle(fontSize: 12),
                                   ),
                                   backgroundColor: widget.primaryColor.withOpacity(0.1),
@@ -624,7 +634,7 @@ class _TutorAvailabilityManagerState extends State<TutorAvailabilityManager> {
                         Icon(Icons.access_time, size: 16, color: widget.secondaryTextColor),
                         const SizedBox(width: 4),
                         Text(
-                          '${availability['start_time']?.substring(0, 5) ?? ''} - ${availability['end_time']?.substring(0, 5) ?? ''}',
+                          '${_formatTimeString(availability['start_time'])} - ${_formatTimeString(availability['end_time'])}',
                           style: TextStyle(
                             fontWeight: FontWeight.w500,
                             color: widget.secondaryTextColor,
