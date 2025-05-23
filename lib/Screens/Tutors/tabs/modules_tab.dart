@@ -82,9 +82,12 @@ class ModulesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+    // Wrap the Column with SingleChildScrollView
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(), // Optional: for a nice scroll effect
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0), // Apply padding to the scrollable area
       child: Column(
+        // mainAxisSize: MainAxisSize.min, // Can be useful for columns in scroll views
         children: [
           _buildModuleCard(
             title: "Photosynthetic Process In Plants",
@@ -95,6 +98,7 @@ class ModulesTab extends StatelessWidget {
             title: "Advanced Algebra Techniques",
             tags: "Math | Algebra | University",
           ),
+          // Add more modules here if needed, or replace with a ListView.builder if dynamic
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () {
@@ -108,6 +112,9 @@ class ModulesTab extends StatelessWidget {
               );
               */
               // print("Create Module button tapped");
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Create Module placeholder tapped')),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor.withOpacity(0.1),

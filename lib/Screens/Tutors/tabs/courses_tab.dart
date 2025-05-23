@@ -69,7 +69,7 @@ class CoursesTab extends StatelessWidget {
           );
         },
         errorBuilder: (context, error, stackTrace) {
-          print("Network image error for $imagePath: $error. Using fallback.");
+          // print("Network image error for $imagePath: $error. Using fallback.");
           // Fallback if network image loading fails
           return Image.asset(
             fallbackImageAsset,
@@ -87,7 +87,7 @@ class CoursesTab extends StatelessWidget {
         height: 90,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
-          print("Local asset error for $imagePath: $error. Using fallback.");
+          // print("Local asset error for $imagePath: $error. Using fallback.");
           // Fallback if the specified local asset itself fails to load
           return Image.asset(
             fallbackImageAsset,
@@ -98,14 +98,14 @@ class CoursesTab extends StatelessWidget {
         },
       );
     } else {
+      // 3. Ultimate Fallback
       imageWidget = Image.asset(
           fallbackImageAsset,
           width: 90,
           height: 90,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
-            print("Ultimate fallback asset error for $fallbackImageAsset: $error");
-
+            // print("Ultimate fallback asset error for $fallbackImageAsset: $error");
             return Container(width: 90, height: 90, color: Colors.grey.shade300, child: Icon(Icons.broken_image, color: Colors.grey.shade600));
           }
       );
@@ -210,7 +210,6 @@ class CoursesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Access CourseProvider. Ensure it's provided above this widget in the tree.
     final courseProvider = Provider.of<CourseProvider>(context, listen: false);
 
     final createCourseButton = ElevatedButton(
@@ -300,9 +299,12 @@ class CoursesTab extends StatelessWidget {
     }
 
     // Main content: Display list of courses
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0),
+    // Wrap the main content Column with SingleChildScrollView
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(), // Optional nice scroll effect
+      padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0), // Apply padding to the scrollable area
       child: Column(
+        // mainAxisSize: MainAxisSize.min, // Can be useful for columns in scroll views
         children: [
           if (coursesError != null && courses.isNotEmpty)
             Padding(
@@ -333,9 +335,9 @@ class CoursesTab extends StatelessWidget {
               ),
             ),
           ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: 16.0),
+            shrinkWrap: true, // Essential for ListView inside SingleChildScrollView
+            physics: const NeverScrollableScrollPhysics(), // Essential for ListView inside SingleChildScrollView
+            // padding: const EdgeInsets.only(bottom: 16.0), // Padding is handled by individual items or the outer SingleChildScrollView
             itemCount: courses.length,
             itemBuilder: (context, index) {
               final course = courses[index];
@@ -344,44 +346,33 @@ class CoursesTab extends StatelessWidget {
               String courseDescription = course['description'] as String? ?? 'No description available.';
               String courseDuration = course['duration'] as String? ?? "N/A";
 
-              String? imageIdentifier = course['image'] as String?; // Can be "assets/...", a full URL, an ID, or null
-              String? finalImagePath;       // Will hold the determined path or URL for the image
+              String? imageIdentifier = course['image'] as String?;
+              String? finalImagePath;
               bool isDeterminedAsNetworkImage = false;
               bool isDeterminedAsLocalAsset = false;
 
-
               if (imageIdentifier != null && imageIdentifier.isNotEmpty) {
                 if (imageIdentifier.startsWith('assets/')) {
-
                   finalImagePath = imageIdentifier;
                   isDeterminedAsLocalAsset = true;
-
                 } else if (Uri.tryParse(imageIdentifier)?.isAbsolute ?? false) {
-
                   finalImagePath = imageIdentifier;
                   isDeterminedAsNetworkImage = true;
-
                 } else {
-
                   finalImagePath = courseProvider.getAssetUrl(imageIdentifier);
                   if (finalImagePath != null && finalImagePath.isNotEmpty) {
-                    isDeterminedAsNetworkImage = true; // Resolved to a network URL
-
+                    isDeterminedAsNetworkImage = true;
                   } else {
-
-                    print("Warning: CourseProvider.getAssetUrl returned null or empty for ID: '$imageIdentifier'. Fallback will be used.");
+                    // print("Warning: CourseProvider.getAssetUrl returned null or empty for ID: '$imageIdentifier'. Fallback will be used.");
                   }
                 }
-              } else {
-
               }
 
               String instructor = course['instructorName'] as String? ?? tutorName;
-
-              String fallbackAsset = 'assets/courses/python.png'; // Your example fallback
+              String fallbackAsset = 'assets/courses/python.png';
 
               return Padding(
-                padding: const EdgeInsets.only(bottom: 16.0),
+                padding: const EdgeInsets.only(bottom: 16.0), // Space between course cards
                 child: _buildCourseCard(
                   context: context,
                   imagePath: finalImagePath,
@@ -396,8 +387,9 @@ class CoursesTab extends StatelessWidget {
               );
             },
           ),
+          // The button is now part of the scrollable content
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0), // Padding for the button
+            padding: const EdgeInsets.only(top: 16.0), // Add some space above the button
             child: createCourseButton,
           ),
         ],

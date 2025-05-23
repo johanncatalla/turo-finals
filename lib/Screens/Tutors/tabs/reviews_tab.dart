@@ -115,9 +115,12 @@ class ReviewsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+    // Wrap the Column with SingleChildScrollView
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(), // Optional: for a nice scroll effect
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0), // Apply padding to the scrollable area
       child: Column(
+        // mainAxisSize: MainAxisSize.min, // Can be useful for columns in scroll views
         children: [
           _buildReviewCard(
             imageAsset: 'assets/English.png', // Make sure this asset exists
@@ -136,6 +139,7 @@ class ReviewsTab extends StatelessWidget {
             "Very knowledgeable and patient. The course material was well-structured. Looking forward to more sessions!",
             rating: 4,
           ),
+          // If you add more reviews or a button, they will also be scrollable
         ],
       ),
     );
