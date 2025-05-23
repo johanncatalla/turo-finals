@@ -38,7 +38,12 @@ class _BookTutorSessionScreenState extends State<BookTutorSessionScreen> {
   }
 
   Future<void> _loadTutorCourses() async {
-    if (widget.tutorProfileId == null) return;
+    print('🔍 Loading courses for tutorProfileId: ${widget.tutorProfileId}');
+    
+    if (widget.tutorProfileId == null) {
+      print('⚠️ No tutorProfileId provided, cannot load courses');
+      return;
+    }
     
     setState(() {
       _isLoadingCourses = true;
@@ -48,18 +53,25 @@ class _BookTutorSessionScreenState extends State<BookTutorSessionScreen> {
     try {
       final response = await _directusService.fetchCoursesByTutorId(widget.tutorProfileId!);
       
+      print('📋 Course loading response: ${response.toString()}');
+      
       if (response['success']) {
+        final coursesList = List<Map<String, dynamic>>.from(response['data'] ?? []);
+        print('✅ Successfully loaded ${coursesList.length} courses for tutor');
+        
         setState(() {
-          _availableCourses = List<Map<String, dynamic>>.from(response['data'] ?? []);
+          _availableCourses = coursesList;
           _isLoadingCourses = false;
         });
       } else {
+        print('❌ Failed to load courses: ${response['message']}');
         setState(() {
           _coursesError = response['message'] ?? 'Failed to load courses';
           _isLoadingCourses = false;
         });
       }
     } catch (e) {
+      print('💥 Exception loading courses: ${e.toString()}');
       setState(() {
         _coursesError = 'Error loading courses: ${e.toString()}';
         _isLoadingCourses = false;
@@ -238,7 +250,7 @@ class _BookTutorSessionScreenState extends State<BookTutorSessionScreen> {
               tutorName: widget.tutorName,
               hourlyRate: widget.hourlyRate,
               preSelectedCourseId: widget.preSelectedCourseId,
-              availableCourses: _availableCourses.isNotEmpty ? _availableCourses : null,
+              availableCourses: _availableCourses,
               primaryColor: const Color(0xFFF9A825), // primaryOrange
               secondaryTextColor: const Color(0xFF616161), // greyText
               cardBackgroundColor: Colors.white,

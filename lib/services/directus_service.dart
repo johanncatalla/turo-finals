@@ -1068,26 +1068,56 @@ class DirectusService {
   }
 
   Future<Map<String, dynamic>> fetchCoursesByTutorId(String tutorId) async {
+    print('🔍 Fetching courses for Tutor ID: $tutorId');
+    
     try {
       final adminToken = dotenv.env['ADMIN_TOKEN'];
 
       if (adminToken == null) {
-        print('Error: Admin token not configured in .env');
+        print('❌ Error: Admin token not configured in .env');
         return {'success': false, 'message': 'Admin token not configured'};
       }
       if (baseUrl == null) {
-        print('Error: Base URL not configured in .env');
+        print('❌ Error: Base URL not configured in .env');
         return {'success': false, 'message': 'Base URL not configured'};
       }
 
-      // Consistent collection name 'Courses' and improved field expansion
-      // Using the same comprehensive fields as getCourses
-      final fields = '*,subject_id.*,course_image.*,tutor_id.user_id.*,bookings.*'; // Added bookings.* if it's relational
+      // First, determine if we have a user ID or a tutor profile ID
+      // Try to find tutor profile by user_id first (in case tutorId is actually a user ID)
+      String actualTutorProfileId = tutorId;
+      
+      print('🔍 Checking if $tutorId is a user ID that needs to be resolved to tutor profile ID...');
+      final tutorProfileResponse = await http.get(
+        Uri.parse('$baseUrl/items/Tutors?filter={"user_id":"$tutorId"}&fields=id'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+      
+      if (tutorProfileResponse.statusCode == 200) {
+        final tutorProfileData = jsonDecode(tutorProfileResponse.body);
+        final tutorProfiles = tutorProfileData['data'] as List;
+        
+        if (tutorProfiles.isNotEmpty) {
+          // Found tutor profile by user_id, so tutorId was actually a user ID
+          actualTutorProfileId = tutorProfiles[0]['id'].toString();
+          print('✅ Resolved user ID $tutorId to tutor profile ID: $actualTutorProfileId');
+        } else {
+          // No tutor profile found by user_id, assume tutorId is already a tutor profile ID
+          print('📋 No tutor profile found by user_id, assuming $tutorId is already a tutor profile ID');
+        }
+      } else {
+        print('⚠️ Could not check user_id mapping (status: ${tutorProfileResponse.statusCode}), assuming $tutorId is already a tutor profile ID');
+      }
+
+      // Now fetch courses using the correct tutor profile ID
+      final fields = '*,subject_id.*,course_image.*,tutor_id.user_id.*';
       final url = Uri.parse(
-        '$baseUrl/items/Courses?filter[tutor_id][_eq]=$tutorId&fields=$fields',
+        '$baseUrl/items/Courses?filter[tutor_id][_eq]=$actualTutorProfileId&fields=$fields',
       );
 
-      // print('Fetching courses by Tutor ID: $tutorId from URL: $url');
+      print('📡 Final API URL: $url');
 
       final response = await http.get(
         url,
@@ -1097,53 +1127,47 @@ class DirectusService {
         },
       );
 
-      final data = jsonDecode(response.body); // Decode once, use for both success and error
+      print('📡 Response Status: ${response.statusCode}');
+      print('📡 Response Body: ${response.body}');
+
+      final data = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        // print('Successfully fetched ${data['data']?.length ?? 0} courses for Tutor ID: $tutorId');
+        final coursesList = data['data'] as List? ?? [];
+        print('✅ Successfully fetched ${coursesList.length} courses for Tutor Profile ID: $actualTutorProfileId (original input: $tutorId)');
 
-        // Optional: Debug first course structure if data is present
-        if (data['data'] is List && data['data'].isNotEmpty) {
-          var firstCourse = data['data'][0];
-          // print('First course sample for Tutor ID $tutorId: ${firstCourse['title']}');
-          // You can add more detailed debugging for tutor_id, subject_id, course_image here if needed
-          if (firstCourse['tutor_id'] != null) {
-            // print('  - Tutor ID data: ${firstCourse['tutor_id']}');
-            if (firstCourse['tutor_id']['user_id'] != null) {
-              // print('    - Tutor User data: ${firstCourse['tutor_id']['user_id']}');
-            }
-          }
-          if (firstCourse['subject_id'] != null) {
-            // print('  - Subject ID data: ${firstCourse['subject_id']}');
-          }
-          if (firstCourse['course_image'] != null) {
-            // print('  - Course Image data: ${firstCourse['course_image']}');
-          }
-          if (firstCourse['bookings'] != null) { // If bookings.* was used and it's a relation
-            // print('  - Bookings data: ${firstCourse['bookings']}');
-          }
-        } else if (data['data'] is List && data['data'].isEmpty) {
-          // print('No courses found for Tutor ID: $tutorId');
+        // Debug each course
+        for (int i = 0; i < coursesList.length; i++) {
+          final course = coursesList[i];
+          print('   📚 Course ${i + 1}: ${course['title']} (ID: ${course['id']})');
+          print('      - Subject: ${course['subject_id']?['name'] ?? course['subject_id']?['subject_name'] ?? 'N/A'}');
+          print('      - Tutor ID: ${course['tutor_id']}');
         }
 
+        if (coursesList.isEmpty) {
+          print('⚠️ No courses found for Tutor Profile ID: $actualTutorProfileId (original input: $tutorId)');
+          print('💡 This could mean:');
+          print('   1. The tutor has not created any courses yet');
+          print('   2. The tutor_id field in courses is not set correctly');
+          print('   3. The tutorProfileId passed is incorrect');
+        }
 
-        return {'success': true, 'data': data['data']};
+        return {'success': true, 'data': coursesList};
       } else {
-        // Improved error message extraction
-        String errorMessage = 'Failed to fetch courses for Tutor ID: $tutorId.';
+        String errorMessage = 'Failed to fetch courses for Tutor Profile ID: $actualTutorProfileId (original input: $tutorId).';
         if (data != null && data['errors'] is List && data['errors'].isNotEmpty) {
           errorMessage += ' Error: ${data['errors'][0]['message']}';
         } else if (response.body.isNotEmpty) {
           errorMessage += ' Response: ${response.body}';
         }
-        // print('Error fetching courses for Tutor ID $tutorId. Status: ${response.statusCode}. Message: $errorMessage');
+        print('❌ Error fetching courses. Status: ${response.statusCode}. Message: $errorMessage');
         return {
           'success': false,
           'message': errorMessage,
         };
       }
     } catch (e) {
-      print('Network error fetching courses by Tutor ID $tutorId: ${e.toString()}');
+      print('💥 Network error fetching courses by Tutor ID $tutorId: ${e.toString()}');
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
@@ -1293,9 +1317,38 @@ class DirectusService {
       final adminToken = dotenv.env['ADMIN_TOKEN'];
       if (adminToken == null) return {'success': false, 'message': 'Admin token not configured.'};
 
-      // Fetch availability from TutorAvailability collection
+      // First, determine if we have a user ID or a tutor profile ID
+      // Try to find tutor profile by user_id first (in case tutorProfileId is actually a user ID)
+      String actualTutorProfileId = tutorProfileId;
+      
+      print('🔍 Checking if $tutorProfileId is a user ID that needs to be resolved to tutor profile ID...');
+      final tutorProfileResponse = await http.get(
+        Uri.parse('$baseUrl/items/Tutors?filter={"user_id":"$tutorProfileId"}&fields=id'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $adminToken',
+        },
+      );
+      
+      if (tutorProfileResponse.statusCode == 200) {
+        final tutorProfileData = jsonDecode(tutorProfileResponse.body);
+        final tutorProfiles = tutorProfileData['data'] as List;
+        
+        if (tutorProfiles.isNotEmpty) {
+          // Found tutor profile by user_id, so tutorProfileId was actually a user ID
+          actualTutorProfileId = tutorProfiles[0]['id'].toString();
+          print('✅ Resolved user ID $tutorProfileId to tutor profile ID: $actualTutorProfileId');
+        } else {
+          // No tutor profile found by user_id, assume tutorProfileId is already a tutor profile ID
+          print('📋 No tutor profile found by user_id, assuming $tutorProfileId is already a tutor profile ID');
+        }
+      } else {
+        print('⚠️ Could not check user_id mapping (status: ${tutorProfileResponse.statusCode}), assuming $tutorProfileId is already a tutor profile ID');
+      }
+
+      // Fetch availability from TutorAvailability collection using the correct tutor profile ID
       final response = await http.get(
-        Uri.parse('$baseUrl/items/TutorAvailability?filter[tutor_id][_eq]=$tutorProfileId&fields=id,day_of_week,start_time,end_time,recurring,specific_date'),
+        Uri.parse('$baseUrl/items/TutorAvailability?filter[tutor_id][_eq]=$actualTutorProfileId&fields=id,day_of_week,start_time,end_time,recurring,specific_date'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $adminToken',
@@ -1309,7 +1362,7 @@ class DirectusService {
       
       if (response.statusCode == 200) {
         final availabilityData = data['data'] as List? ?? [];
-        print('✅ Successfully fetched ${availabilityData.length} availability records from Directus');
+        print('✅ Successfully fetched ${availabilityData.length} availability records from Directus for tutor profile ID: $actualTutorProfileId (original input: $tutorProfileId)');
         
         // Log each record for debugging
         for (int i = 0; i < availabilityData.length; i++) {

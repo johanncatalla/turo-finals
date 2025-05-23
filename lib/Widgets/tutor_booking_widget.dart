@@ -567,7 +567,7 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
         const SizedBox(height: 16),
 
         // Course Selection
-        if (widget.availableCourses != null && widget.availableCourses!.isNotEmpty) ...[
+        if (widget.availableCourses != null) ...[
           Text(
             'Select Course',
             style: TextStyle(
@@ -577,31 +577,55 @@ class _TutorBookingWidgetState extends State<TutorBookingWidget> {
             ),
           ),
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: widget.borderColor),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedCourseId,
-                hint: const Text('Choose a course'),
-                isExpanded: true,
-                items: widget.availableCourses!.map((course) {
-                  return DropdownMenuItem<String>(
-                    value: course['id'].toString(),
-                    child: Text(course['title'] ?? 'Unknown Course'),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCourseId = value;
-                  });
-                },
+          
+          if (widget.availableCourses!.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                border: Border.all(color: widget.borderColor),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedCourseId,
+                  hint: const Text('Choose a course'),
+                  isExpanded: true,
+                  items: widget.availableCourses!.map((course) {
+                    return DropdownMenuItem<String>(
+                      value: course['id'].toString(),
+                      child: Text(course['title'] ?? 'Unknown Course'),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedCourseId = value;
+                    });
+                  },
+                ),
               ),
             ),
-          ),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.orange, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This tutor has no courses available for booking at the moment.',
+                      style: TextStyle(color: Colors.orange[800]),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
         ],
 

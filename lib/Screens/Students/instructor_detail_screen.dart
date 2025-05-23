@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:turo/providers/course_provider.dart';
 import 'package:turo/Screens/Students/book_tutor_session_screen.dart';
+import 'package:turo/services/directus_service.dart';
 
 class InstructorDetailScreen extends StatelessWidget {
   final Map<String, dynamic> instructor;
@@ -144,50 +145,76 @@ class InstructorDetailScreen extends StatelessWidget {
                         child: SizedBox(
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: () {
-                              // Navigate to booking screen
-                              // Map instructor data to correct tutor profile ID
-                              String? tutorProfileId;
-                              String tutorUserId;
+                            onPressed: () async {
+                              // Get user ID and resolve to real tutor profile ID
+                              String tutorUserId = instructor['user_id']?.toString() ?? 
+                                                 instructor['id']?.toString() ?? '';
                               
-                              // Try to get the tutor profile ID from various possible fields
-                              if (instructor['tutor_profile_id'] != null) {
-                                tutorProfileId = instructor['tutor_profile_id'].toString();
-                              } else if (instructor['profile_id'] != null) {
-                                tutorProfileId = instructor['profile_id'].toString();
-                              } else if (instructor['tutor_id'] != null) {
-                                tutorProfileId = instructor['tutor_id'].toString();
-                              } else {
-                                // For demo purposes, map instructor names to sample tutor IDs
-                                // This should be replaced with actual database lookups
-                                final instructorName = instructor['name']?.toString().toLowerCase() ?? '';
-                                if (instructorName.contains('joshua') || instructorName.contains('garcia')) {
-                                  tutorProfileId = '1'; // Maps to sample tutor ID 1
-                                } else if (instructorName.contains('andres') || instructorName.contains('muhlach')) {
-                                  tutorProfileId = '2'; // Maps to sample tutor ID 2
-                                } else {
-                                  tutorProfileId = '3'; // Default to sample tutor ID 3
-                                }
+                              if (tutorUserId.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Unable to identify this tutor. Please try again.'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
                               }
                               
-                              // Get user ID
-                              tutorUserId = instructor['user_id']?.toString() ?? 
-                                           instructor['id']?.toString() ?? 
-                                           'sample-user-id-${tutorProfileId}';
-                              
-                              print('Navigating to booking with tutorProfileId: $tutorProfileId, tutorUserId: $tutorUserId');
-                              
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => BookTutorSessionScreen(
-                                    tutorUserId: tutorUserId,
-                                    tutorName: instructor['name']?.toString() ?? 'Unknown Instructor',
-                                    tutorProfileId: tutorProfileId,
-                                    hourlyRate: instructor['hourly_rate'] is num ? instructor['hourly_rate'].toDouble() : 100.0,
-                                  ),
-                                ),
+                              // Show loading dialog while resolving tutor profile
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (BuildContext context) {
+                                  return const AlertDialog(
+                                    content: Row(
+                                      children: [
+                                        CircularProgressIndicator(),
+                                        SizedBox(width: 16),
+                                        Text('Loading booking page...'),
+                                      ],
+                                    ),
+                                  );
+                                },
                               );
+                              
+                              try {
+                                // Use the DirectusService to resolve user ID to tutor profile ID
+                                final directusService = DirectusService();
+                                final response = await directusService.fetchCoursesByTutorId(tutorUserId);
+                                
+                                // Close loading dialog
+                                if (context.mounted) Navigator.pop(context);
+                                
+                                print('🔍 Resolved courses for tutorUserId: $tutorUserId');
+                                print('📋 Response: ${response.toString()}');
+                                
+                                // Navigate to booking regardless of courses found
+                                // The booking screen will handle the course loading itself
+                                if (context.mounted) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => BookTutorSessionScreen(
+                                        tutorUserId: tutorUserId,
+                                        tutorName: instructor['name']?.toString() ?? 'Unknown Instructor',
+                                        tutorProfileId: tutorUserId, // Pass the user ID, let booking screen resolve it
+                                        hourlyRate: instructor['hourly_rate'] is num ? instructor['hourly_rate'].toDouble() : 100.0,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                // Close loading dialog if still open
+                                if (context.mounted) Navigator.pop(context);
+                                
+                                print('❌ Error resolving tutor profile: $e');
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error loading booking page: ${e.toString()}'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue,
